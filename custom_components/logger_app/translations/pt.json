@@ -117,6 +117,9 @@
     },
     "ambiguous_quick_entry": {
       "message": "Há várias entradas rápidas chamadas “{entry}”: indique o id."
+    },
+    "scene_failed": {
+      "message": "Cena do Logger — {words}"
     }
   },
   "services": {

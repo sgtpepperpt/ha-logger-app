@@ -1,10 +1,13 @@
 {
-  "doc": "The Home Assistant integration's contract with Logger (logger_app, github.com/sgtpepperpt/ha-logger-app; docs/home-assistant.md): one example answer of every route it reads — GET /about, GET /status?tz=, GET /quick (one entry of each kind), POST /quick/<id>/fire (201, and a med tick's 409 with `already`), POST /shopping (201, and 202 = queued while Nextcloud is down), POST /tablet/wake (200, and 409 = not set up), GET /alerts — keyed by HTTP status where a route has two. backend/tests/test_ha_contract.py checks every key path here against what the server answers, with the same JSON type (null = the key is nullable); the integration's tests parse a copy. A key the server adds never breaks the integration and never bumps `about.api`; a key it reads renamed, removed or retyped does both. `status.food` = status_parity.json's first case (25 Oct 13:30Z, Lisbon). `status.changes` is keyed by data: one key per kind written so far (food, body, blood, journal, meds, goals, pressure, workouts, tasks). Null means unknown, never 0: no calorie goal, no medication today, Tasks off. Instants are ISO 8601 with an offset; the caller's `tz` decides every day.",
+  "doc": "The Home Assistant integration's contract with Logger (logger_app, github.com/sgtpepperpt/ha-logger-app; docs/home-assistant.md): one example answer of every route it reads — GET /about, GET /status?tz=, GET /quick (one entry of each kind), POST /quick/<id>/fire (201, and a med tick's 409 with `already`), POST /shopping (201, and 202 = queued while Nextcloud is down), POST /tablet/wake (200, and 409 = not set up), GET /alerts — keyed by HTTP status where a route has two. Rules + scenes (F39, `about.features` has \"rules\"): `ha_catalog.request` = the body the integration PUTs to /ha/catalog (Logger checks it is accepted), `ha_actions` = GET /ha/actions (the integration's every poll: waiting actions to run + the revs it refetches /ha/rules?kind=from_ha and /ha/scenes on), `ha_action_result` = POST /ha/actions/<id>/result, `ha_rules` = GET /ha/rules?kind=from_ha (HA-side triggers to register; a `device` one carries the trigger config as HA listed it), `ha_rule_fire` = POST /ha/rules/<id>/fire (an HA trigger happened: Logger runs the rule's Logger-side actions itself), `ha_rule_state` = POST /ha/rules/<id>/state (registration outcome), `ha_scenes` = GET /ha/scenes, `ha_webhook` = the body Logger POSTs to the integration's webhook (a nudge, never data). backend/tests/test_ha_contract.py checks every key path here against what the server answers, with the same JSON type (null = the key is nullable); the integration's tests parse a copy. A key the server adds never breaks the integration and never bumps `about.api`; a key it reads renamed, removed or retyped does both. `status.food` = status_parity.json's first case (25 Oct 13:30Z, Lisbon). `status.changes` is keyed by data: one key per kind written so far (food, body, blood, journal, meds, goals, pressure, workouts, tasks). Null means unknown, never 0: no calorie goal, no medication today, Tasks off. Instants are ISO 8601 with an offset; the caller's `tz` decides every day.",
   "about": {
     "name": "Logger",
     "api": 1,
     "instance_id": "7c1e5f0a-3b9d-4e2a-9f61-0d4b8a2c6e35",
-    "code": "3f2a9c1d7e4b"
+    "code": "3f2a9c1d7e4b",
+    "features": [
+      "rules"
+    ]
   },
   "status": {
     "as_of": "2026-10-25T13:30:00.418204+00:00",
@@ -433,5 +436,416 @@
         "href": "/tasks"
       }
     ]
+  },
+  "ha_catalog": {
+    "request": {
+      "ha": {
+        "version": "2026.2.3",
+        "webhook": "http://192.168.1.20:8123/api/webhook/logger_app_5c0d2e7f4a1b"
+      },
+      "scenes": [
+        {
+          "entity_id": "scene.cinema",
+          "name": "Cinema",
+          "area": "Sala"
+        }
+      ],
+      "scripts": [
+        {
+          "entity_id": "script.good_night",
+          "name": "Good night",
+          "area": null
+        }
+      ],
+      "lights": [
+        {
+          "entity_id": "light.kitchen",
+          "name": "Kitchen",
+          "area": "Cozinha",
+          "brightness": true,
+          "color_temp": true,
+          "color": false
+        }
+      ],
+      "switches": [
+        {
+          "entity_id": "switch.kettle",
+          "name": "Kettle",
+          "area": "Cozinha"
+        }
+      ],
+      "media_players": [
+        {
+          "entity_id": "media_player.kitchen_speaker",
+          "name": "Kitchen speaker",
+          "area": "Cozinha",
+          "volume": true,
+          "sources": [
+            "Radio Comercial",
+            "Spotify"
+          ]
+        }
+      ],
+      "tts": [
+        {
+          "entity_id": "tts.google_translate_pt_pt",
+          "name": "Google Translate pt"
+        }
+      ],
+      "satellites": [
+        {
+          "entity_id": "assist_satellite.kitchen",
+          "name": "Kitchen voice",
+          "area": "Cozinha"
+        }
+      ],
+      "notify": [
+        {
+          "service": "notify.mobile_app_pixel_9",
+          "name": "Pixel 9"
+        }
+      ],
+      "persons": [
+        {
+          "entity_id": "person.g",
+          "name": "G"
+        }
+      ],
+      "zones": [
+        {
+          "entity_id": "zone.home",
+          "name": "Home"
+        }
+      ],
+      "entities": [
+        {
+          "entity_id": "binary_sensor.front_door",
+          "name": "Front door",
+          "area": "Entrada",
+          "domain": "binary_sensor",
+          "states": [
+            "on",
+            "off"
+          ]
+        }
+      ],
+      "device_triggers": [
+        {
+          "id": "9f3c2a1b0d4e5f60",
+          "device": "Pill box button",
+          "area": "Cozinha",
+          "words": "Button 1 · short press",
+          "trigger": {
+            "trigger": "device",
+            "domain": "zha",
+            "device_id": "c5a1e0b2d3f4a5b6c7d8e9f0a1b2c3d4",
+            "type": "remote_button_short_press",
+            "subtype": "button_1"
+          }
+        }
+      ]
+    },
+    "200": {
+      "ok": true,
+      "at": "2026-10-27T10:00:00.120000+00:00",
+      "counts": {
+        "scenes": 1,
+        "scripts": 1,
+        "lights": 1,
+        "switches": 1,
+        "media_players": 1,
+        "tts": 1,
+        "satellites": 1,
+        "notify": 1,
+        "persons": 1,
+        "zones": 1,
+        "entities": 1,
+        "device_triggers": 1
+      },
+      "webhook": true,
+      "webhook_error": null
+    }
+  },
+  "ha_actions": {
+    "200": {
+      "actions": [
+        {
+          "id": 41,
+          "rule_id": 2,
+          "n": 0,
+          "created_at": "2026-10-27T10:01:00+00:00",
+          "do": {
+            "type": "light",
+            "entity_id": "light.kitchen",
+            "state": "flash",
+            "brightness": null,
+            "color_temp_k": null
+          }
+        },
+        {
+          "id": 42,
+          "rule_id": 2,
+          "n": 1,
+          "created_at": "2026-10-27T10:01:00+00:00",
+          "do": {
+            "type": "announce",
+            "target": "media_player.kitchen_speaker",
+            "engine": null,
+            "text": "Omega-3 overdue since 08:00"
+          }
+        },
+        {
+          "id": 43,
+          "rule_id": 5,
+          "n": 0,
+          "created_at": "2026-10-27T10:02:00+00:00",
+          "do": {
+            "type": "notify",
+            "service": "notify.mobile_app_pixel_9",
+            "title": "Glucose low",
+            "text": "Glucose 62 mg/dL ↓"
+          }
+        },
+        {
+          "id": 44,
+          "rule_id": 6,
+          "n": 0,
+          "created_at": "2026-10-27T10:03:00+00:00",
+          "do": {
+            "type": "scene",
+            "entity_id": "scene.cinema"
+          }
+        },
+        {
+          "id": 45,
+          "rule_id": 6,
+          "n": 1,
+          "created_at": "2026-10-27T10:03:00+00:00",
+          "do": {
+            "type": "script",
+            "entity_id": "script.good_night"
+          }
+        },
+        {
+          "id": 46,
+          "rule_id": 6,
+          "n": 2,
+          "created_at": "2026-10-27T10:03:00+00:00",
+          "do": {
+            "type": "switch",
+            "entity_id": "switch.kettle",
+            "state": "off"
+          }
+        },
+        {
+          "id": 47,
+          "rule_id": null,
+          "n": 0,
+          "created_at": "2026-10-27T10:04:00+00:00",
+          "do": {
+            "type": "logger_scene",
+            "scene_id": 1,
+            "name": "Evening",
+            "entities": [
+              {
+                "entity_id": "light.kitchen",
+                "state": "on",
+                "brightness": 40,
+                "color_temp_k": 2700,
+                "volume": null,
+                "source": null
+              },
+              {
+                "entity_id": "media_player.kitchen_speaker",
+                "state": "on",
+                "brightness": null,
+                "color_temp_k": null,
+                "volume": 25,
+                "source": "Radio Comercial"
+              }
+            ]
+          }
+        }
+      ],
+      "rules_rev": "4.1761559000",
+      "scenes_rev": "1.1761558000",
+      "catalog_at": "2026-10-27T10:00:00.120000+00:00",
+      "catalog_wanted": false
+    }
+  },
+  "ha_action_result": {
+    "request_ok": {
+      "ok": true,
+      "words": "Kitchen flashed"
+    },
+    "request_failed": {
+      "ok": false,
+      "error": "light.kitchen is unavailable"
+    },
+    "200": {
+      "ok": true
+    },
+    "409": {
+      "ok": false,
+      "error": "That action was already answered."
+    }
+  },
+  "ha_rules": {
+    "200": {
+      "rev": "4.1761559000",
+      "rules": [
+        {
+          "id": 3,
+          "kind": "from_ha",
+          "name": "Pill box → Morning box",
+          "enabled": true,
+          "when": {
+            "type": "device",
+            "trigger_id": "9f3c2a1b0d4e5f60",
+            "trigger": {
+              "trigger": "device",
+              "domain": "zha",
+              "device_id": "c5a1e0b2d3f4a5b6c7d8e9f0a1b2c3d4",
+              "type": "remote_button_short_press",
+              "subtype": "button_1"
+            }
+          },
+          "do": [
+            {
+              "type": "quick",
+              "preset_id": 20
+            }
+          ],
+          "options": {
+            "quiet": null,
+            "min_gap_s": 0,
+            "once_a_day": false
+          },
+          "problem": null
+        },
+        {
+          "id": 4,
+          "kind": "from_ha",
+          "name": "Home → open at casa",
+          "enabled": true,
+          "when": {
+            "type": "zone",
+            "person": "person.g",
+            "zone": "zone.home",
+            "event": "enter"
+          },
+          "do": [
+            {
+              "type": "quick",
+              "preset_id": 16
+            }
+          ],
+          "options": {
+            "quiet": {
+              "from": "23:00",
+              "to": "07:30"
+            },
+            "min_gap_s": 3600,
+            "once_a_day": false
+          },
+          "problem": null
+        },
+        {
+          "id": 7,
+          "kind": "from_ha",
+          "name": "Door → wake the tablet",
+          "enabled": false,
+          "when": {
+            "type": "state",
+            "entity_id": "binary_sensor.front_door",
+            "to": "on",
+            "from": null,
+            "for_s": null
+          },
+          "do": [
+            {
+              "type": "tablet_wake"
+            }
+          ],
+          "options": {
+            "quiet": null,
+            "min_gap_s": 0,
+            "once_a_day": false
+          },
+          "problem": "Home Assistant refused the trigger: Unknown entity binary_sensor.front_door"
+        }
+      ]
+    }
+  },
+  "ha_rule_fire": {
+    "request": {
+      "at": "2026-10-27T08:02:11.250000+00:00",
+      "event": "1f0c9b8e-6a2d-4c3b-9e7f-5a4d3c2b1a09"
+    },
+    "200": {
+      "ok": true,
+      "ran": true,
+      "skipped": null,
+      "words": "Morning box: 1 tab"
+    },
+    "200_skipped": {
+      "ok": true,
+      "ran": false,
+      "skipped": "quiet",
+      "words": "Quiet hours, 23:00–07:30"
+    },
+    "200_failed": {
+      "ok": false,
+      "ran": true,
+      "skipped": null,
+      "words": "already taken: Omega-3",
+      "error": "already taken: Omega-3"
+    },
+    "404": {
+      "ok": false,
+      "error": "No rule #9"
+    }
+  },
+  "ha_rule_state": {
+    "request": {
+      "error": "Home Assistant refused the trigger: Unknown entity binary_sensor.front_door"
+    },
+    "200": {
+      "ok": true
+    }
+  },
+  "ha_scenes": {
+    "200": {
+      "rev": "1.1761558000",
+      "scenes": [
+        {
+          "id": 1,
+          "name": "Evening",
+          "icon": "mdi:weather-sunset",
+          "entities": [
+            {
+              "entity_id": "light.kitchen",
+              "state": "on",
+              "brightness": 40,
+              "color_temp_k": 2700,
+              "volume": null,
+              "source": null
+            },
+            {
+              "entity_id": "media_player.kitchen_speaker",
+              "state": "on",
+              "brightness": null,
+              "color_temp_k": null,
+              "volume": 25,
+              "source": "Radio Comercial"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "ha_webhook": {
+    "logger": "7c1e5f0a-3b9d-4e2a-9f61-0d4b8a2c6e35",
+    "reason": "actions"
   }
 }

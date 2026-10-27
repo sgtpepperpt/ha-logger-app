@@ -117,6 +117,9 @@
     },
     "ambiguous_quick_entry": {
       "message": "Several quick entries are named “{entry}”: give its id."
+    },
+    "scene_failed": {
+      "message": "Logger scene — {words}"
     }
   },
   "services": {

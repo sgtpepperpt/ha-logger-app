@@ -8,7 +8,7 @@ Logger's contract (`GET /about` `api`, `backend/tests/fixtures/ha_contract.json`
 change that touches the contract updates this repo in the same piece of work, copies the fixture
 here and bumps `manifest.json` `version`. A `ship` / `ship both` in a Logger session ships this repo
 too when it has pending work. Spec: Logger's
-`docs/feature-plan-2026-10-pass3.md` → *F30*. User doc: Logger's `docs/home-assistant.md` (mirrors
+`docs/feature-plan-2026-10-pass3.md` → *F30*, `-pass4.md` → *F39* (rules + scenes). User doc: Logger's `docs/home-assistant.md` (mirrors
 this README's tables — keep them consistent; when they must differ, tell the user what to change
 there).
 
@@ -35,6 +35,8 @@ there).
   2026.10.x on 2026-10-27) rejects the key; add `"categories": ["health_wellbeing"]` once that
   image is ≥ 2026.11 (the HACS action only warns while it is missing).
 - No HACS default-list submission, no brands-repo PR.
+- `dependencies: ["webhook"]` only; no `after_dependencies` (hassfest allows `device_automation`,
+  `zone`, `person`, `script`, `automation` and every platform).
 
 ## The contract (the two repos meet only here)
 
@@ -42,7 +44,14 @@ there).
   `backend/tests/fixtures/ha_contract.json`. Never edit it here. Logger changed it → copy it over
   (`cp …/logger/backend/tests/fixtures/ha_contract.json tests/fixtures/`), run the tests, adapt,
   release.
-- `GET /api/about` → `{name, api, instance_id, code}`. `const.API_MAX` = the highest `api` this
+- `GET /api/about` → `{name, api, instance_id, code, features}`; `features` (optional, never an `api`
+  bump): `"rules"` = the `/ha/*` routes. Read at setup only. Without it: no `/ha/*` call, no
+  webhook, no scene.
+- `/ha/*` bodies = the fixture's `ha_*` request shapes exactly, no `tz`. A result's 404/409 = fine.
+  A fire is retried with the same `event` after 30/90/180 s on no answer or a 5xx; a 404 refetches
+  the rules. `/state` only when the outcome differs from `problem`. A device trigger's `id` =
+  `catalog.trigger_id` over its identity keys only (Logger keys rules by it: never hash the whole
+  config). `const.API_MAX` = the highest `api` this
   integration reads (now 1); a higher one is refused (`unsupported_api`), lower ones are fine.
   Logger bumps `api` only on a breaking change to a shape read here; added keys never bump it.
 - `instance_id` = the config entry's unique_id, the device identifier, every entity's unique_id
@@ -66,10 +75,24 @@ there).
 `logger_app_fired` event) + value helpers · `entity.py` device · `sensor.py` / `binary_sensor.py`
 description tables · `button.py` dynamic quick buttons (registry cleanup) · `services.py` actions
 (registered once in `async_setup`) · `config_flow.py` user / reconfigure / options ·
-`diagnostics.py` · `translations/en.json` = the source (no `strings.json` in custom
+`diagnostics.py` · `rules.py` the F39 cycle (queue → actions → rules → scenes → catalog; one at a time,
+entry background task, never fails the poll) · `actions.py` runs a `do` or scene states ·
+`triggers.py` `when` → HA trigger · `catalog.py` the PUT body + webhook URL · `webhook.py` the nudge
+(`entry.data["webhook_id"]`) · `scene.py` dynamic Logger scenes, registry cleanup as `button.py` ·
+`translations/en.json` = the source (no `strings.json` in custom
 integrations); `pt.json` mirrors it (pt-PT).
 
 - English entity names slug to their keys (entity ids `sensor.logger_<key>`) — keep it so.
+- Triggers: `trigger:` config → `cv.TRIGGER_SCHEMA` → `async_validate_trigger_config` → one
+  `async_initialize_triggers` per rule (failures only via `log_cb`, it never raises); never pass
+  `home_assistant_start` (deprecated 2026.10).
+- Work that resolves integrations (trigger registration, the catalog build) runs `_shielded`:
+  cancelling HA's loader mid-resolution leaves that lookup hanging forever.
+- Scenes: media players `turn_on`/`turn_off` only when supported, else `media_stop`.
+- Device rules: only a `device` config with `domain` + `device_id`; anything else is refused before
+  HA validation (*Not a device trigger*); `variables`/`enabled` dropped; `for_s` must be a number.
+- Registrations kept per rule as id + built config (`triggers.config_key`): a refetch keeps
+  unchanged ones (a pending `for:` runs on), re-registers or removes only changed, disabled or gone.
 - hassfest refuses URLs and HTML in translation strings: the LAN example goes through the
   `{lan}` description placeholder.
 
@@ -78,6 +101,8 @@ integrations); `pt.json` mirrors it (pt-PT).
 - `.venv/bin/pytest` and `.venv-latest/bin/pytest`; `.venv/bin/ruff check . && .venv/bin/ruff format --check .`
 - hassfest + HACS action run in CI only (`validate.yml`); the HACS action also checks the GitHub
   repo's description, topics and issues.
+- `conftest.mock_ha` answers `/ha/*` from the fixture with an empty queue and without the zha
+  device rule (HA would try to import zha); pass `rules=` to include it.
 - Live shapes: the Logger dev stack at `http://localhost:5173/api` — **GET only**
   (`/about`, `/status?tz=…`, `/quick`, `/alerts`). Its database is a copy of production: never
   POST/PUT/DELETE there, never add it to the user's HA (same `instance_id` as prod).

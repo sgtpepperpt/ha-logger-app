@@ -2,10 +2,14 @@
 
 The Home Assistant client of **Logger**, a self-hosted personal health logger (food, glucose,
 medication, symptoms, tasks): its numbers as sensors, its quick entries as buttons, three actions,
-one event. Local polling over the LAN; no cloud, no account.
+one event — and Logger's hands in Home Assistant: the rules and scenes made in Logger run here
+(*Rules and scenes*), so Home Assistant is never edited by hand. Local polling over the LAN; no
+cloud, no account.
 
 - Domain `logger_app` (Home Assistant's own `logger` integration owns `logger`); display name *Logger*.
 - Needs Home Assistant **2026.2** or newer, HACS, and a Logger answering `GET /api/about` with `api: 1`.
+  Rules and scenes need a Logger whose `/about` lists `features: ["rules"]`; with an older one the
+  integration does exactly what it did before (no other call, no webhook, no scene).
 
 ## Install
 
@@ -49,6 +53,7 @@ scheduled today, Tasks off, no CGM, a key this Logger doesn't send.
 | binary_sensor | `sensor_ending_soon` | `glucose.sensor.ending_soon` | problem; attrs `ends` `expired` |
 | button | `quick_<id>` | `GET /quick` | one per quick entry, named and iconed as in Logger; a press fires it |
 | button | `tablet_wake` · `refresh` | | wake the kitchen tablet · read Logger again now (always pressable) |
+| scene | `scene.logger_<name>` | `GET /ha/scenes` | one per Logger scene, named and iconed as there; see *Scenes* |
 
 - One poll = `GET /status?tz=` every *scan interval* (+ `GET /alerts` with *alerts* on). Logger
   unreachable or a 5xx: every entity *unavailable* until a poll answers again.
@@ -95,6 +100,62 @@ actions:
       message: "{{ trigger.event.data.words }}"
 ```
 
+## Rules and scenes
+
+Made in Logger → Settings → Home Assistant; run here. With a Logger offering them (`features:
+["rules"]`), after every poll that answered and on every nudge from Logger, one *cycle* (never two
+at once; a failing one is logged and never makes the entities unavailable):
+
+1. `GET /ha/actions` — what Logger's rules want done (*Logger → HA*), oldest first, each handed out
+   once: run in order, each result posted back (`POST /ha/actions/<id>/result`, Logger's Recent).
+2. `rules_rev` changed → `GET /ha/rules?kind=from_ha` — the *HA → Logger* rules, each registered as
+   a Home Assistant trigger (below); only what changed is touched: a rule whose trigger is the
+   same keeps its registration (a pending `for` runs on), one turned off or deleted is removed.
+3. `scenes_rev` changed → `GET /ha/scenes` — the scene entities follow.
+4. `PUT /ha/catalog` — what Home Assistant has, so Logger offers names, never ids: when Logger asks,
+   at start, every 24 h, and 10 s after an entity/device/area registry change that changes it.
+
+| Action Logger queues | Home Assistant runs | Words back |
+| --- | --- | --- |
+| `scene` · `script` | `scene.turn_on` · `script.turn_on` | *Cinema on* · *Good night started* |
+| `light` on / off / flash | `light.turn_on` (`brightness_pct`, `color_temp_kelvin` when set) / `light.turn_off` / `light.turn_on` `flash: long` | *Kitchen flashed* |
+| `switch` on / off | `switch.turn_on` / `turn_off` | *Kettle off* |
+| `announce` | a satellite: `assist_satellite.announce`; a media player: `tts.speak` with Logger's engine, else the first `tts.*` | *Announced on Kitchen speaker* |
+| `notify` | that `notify.<target>` with `title`, `message` | *Sent to Pixel 9* |
+| `logger_scene` | a Logger scene's states (*Scenes*) | *Evening: 3 set, 1 not in Home Assistant* |
+
+- An action fails — no such service, an entity Home Assistant hasn't got or one unavailable, a
+  refusal, 30 s gone — with a short sentence, which Logger shows. Texts arrive filled in by Logger
+  and go out as they are: no templates.
+- **HA → Logger rules** (a button's press, a person entering or leaving a zone, an entity's state)
+  are registered with Home Assistant's own automation triggers: `device` = the trigger config Home
+  Assistant listed in the catalog — only ever a device trigger (anything else Logger hands back is
+  refused: *Not a device trigger*), `zone` = `{person, zone, enter|leave}`, `state` = `{entity_id,
+  to, from?, for?}`. When one fires, Logger is told (`POST /ha/rules/<id>/fire` `{at, event}`) and
+  runs the rule itself — quiet hours, gaps, once a day are Logger's. No answer from Logger: the same
+  call (same `event`, so it runs once) again after 30 s, 90 s, 180 s, then given up (logged).
+- A trigger Home Assistant refuses (a device gone, its integration still loading) is the rule's
+  *problem* in Logger (`POST /ha/rules/<id>/state`), tried again every 10 cycles; cleared once it
+  registers.
+- **The webhook** — the integration registers `POST /api/webhook/<id>` (a random id kept in the
+  entry) and tells Logger its address in the catalog: Home Assistant's *internal* URL only,
+  `local_only` (ignored from outside the LAN), no auth (Home Assistant webhooks have none: the id is
+  the secret). It carries a nudge, never data — `{logger, reason}`; a nudge from another `logger` is
+  ignored, any other runs a cycle at once (`reason: catalog` also sends the catalog). Everything else
+  is fetched from Logger. Home Assistant without an internal URL, or Logger refusing it: no nudges —
+  the poll carries everything one scan interval later.
+
+### Scenes
+
+Logger owns them; Home Assistant shows one `scene.logger_<name>` each (unique id
+`<instance_id>_scene_<id>`), activatable from a dashboard, an automation or Assist. Activating one
+applies its states entity by entity: lights on (brightness, colour temperature, a transition when
+given) or off, switches, media players (on, volume, source; off — a speaker that can't be: stopped).
+An entity Home Assistant hasn't got is skipped and counted; one that fails is an error once the rest
+is applied. A scene added in Logger appears with the next cycle that sees the new `scenes_rev`, one
+deleted goes (removed, not left unavailable); a rename keeps the entity id. They work while Logger
+restarts (their states are here); they leave with the integration.
+
 ## Options
 
 Settings → Devices & services → *Logger* → **Configure**: *scan interval* 15–600 s (60), *time zone*
@@ -113,9 +174,15 @@ on/off (the `problems` sensor). **Reconfigure** = a new address for the same Log
 | entities *unavailable* | the last poll failed (network, Logger restarting); back with the next answer |
 | an entity *unknown* | Logger said null — not 0, not an error |
 | a button / action error with a sentence | Logger refused it, nothing written |
+| Logger: *Home Assistant hasn't checked in* | no catalog for a day: Home Assistant can't reach Logger, or the integration was set up before Logger had rules — the feature is read at setup: reload the entry (or restart Home Assistant) after updating Logger |
+| Logger: *push failing — polling* | Home Assistant has no internal URL (Settings → System → Network) or Logger refused it: actions still run, a scan interval later |
+| a rule's problem in Logger: *Home Assistant refused the trigger: …* | its device or entity is gone, or its integration was still loading: tried again every 10 cycles, cleared once it registers |
+| a scene activation error *Logger scene — …* | an entity of it refused (the words say which); the rest was applied |
 
 - *Download diagnostics* (the integration's ⋮): the entry, `/about`, the last `/status`, `/quick`,
-  `/alerts`.
+  `/alerts`; with rules: the webhook (registered, its URL, Logger's verdict), the last cycle and its
+  error, actions run, triggers registered / refused / fired, the revs, scenes, the last catalog and
+  its counts. The webhook id shows only its first 4 characters.
 - Every press and action is in Logger's Audit tab as client *ha* (the integration sends
   `X-Logger-Client: ha`).
 - A copy of Logger restored elsewhere answers with the same `instance_id`: never add a dev copy of

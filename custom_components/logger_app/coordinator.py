@@ -4,7 +4,8 @@ A poll = `GET /status?tz=` (+ `GET /alerts` with the alerts option on); `GET /qu
 first poll, every QUICK_EVERY-th after it, and at once when a press found an entry gone.
 Logger unreachable or a 5xx → UpdateFailed → every entity unavailable until a poll answers.
 Logger's null is HA's unknown, never 0: the value helpers below return None for null, for a
-missing key and for a value of the wrong type alike.
+missing key and for a value of the wrong type alike. With the rules feature on, every poll
+that answered also asks for a rules cycle (rules.py), which never fails the poll.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from collections.abc import Awaitable
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -31,6 +32,9 @@ from .const import (
     EVENT_FIRED,
     QUICK_EVERY,
 )
+
+if TYPE_CHECKING:
+    from .rules import LoggerRules
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -113,6 +117,8 @@ class LoggerCoordinator(DataUpdateCoordinator[LoggerData]):
         self.client = client
         self.about = about
         self.alerts_on: bool = entry.options.get(CONF_ALERTS, DEFAULT_ALERTS)
+        # Rules + scenes (F39): only with a Logger whose `/about.features` has "rules".
+        self.rules: LoggerRules | None = None
         self._polls = 0
         self._quick_due = True
 
@@ -135,6 +141,8 @@ class LoggerCoordinator(DataUpdateCoordinator[LoggerData]):
         if reread:
             self._quick_due = False  # only now: a failed poll reads the list again
         self._polls += 1
+        if self.rules is not None:
+            self.rules.async_request_cycle()  # in the background: never this poll's fault
         return LoggerData(status, quick, alerts)
 
     async def async_quick_now(self) -> list[dict[str, Any]]:

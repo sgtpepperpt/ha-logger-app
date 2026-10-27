@@ -123,3 +123,107 @@ async def test_quick_skips_malformed_rows(
         f"{API}/quick", json=[{"id": 1, "name": "a"}, {"name": "no id"}, "junk"]
     )
     assert await client.quick() == [{"id": 1, "name": "a"}]
+
+
+@pytest.mark.parametrize(
+    ("sent", "features"),
+    [
+        ({"features": ["rules"]}, ("rules",)),
+        ({"features": ["rules", 3, None, "later"]}, ("rules", "later")),
+        ({"features": "rules"}, ()),
+        ({}, ()),  # an older Logger
+    ],
+)
+async def test_about_features(
+    client: LoggerClient,
+    aioclient_mock: AiohttpClientMocker,
+    contract: dict[str, Any],
+    sent: dict[str, Any],
+    features: tuple[str, ...],
+) -> None:
+    about = {k: v for k, v in contract["about"].items() if k != "features"}
+    aioclient_mock.get(f"{API}/about", json={**about, **sent})
+    assert (await client.about()).features == features
+
+
+async def test_ha_routes_send_the_contracts_bodies(
+    client: LoggerClient,
+    aioclient_mock: AiohttpClientMocker,
+    contract: dict[str, Any],
+) -> None:
+    """The `/ha/*` writes carry exactly the contract's bodies — no `tz` — and every
+    request names its client and sends no Origin."""
+    aioclient_mock.put(f"{API}/ha/catalog", json=contract["ha_catalog"]["200"])
+    aioclient_mock.get(f"{API}/ha/actions", json=contract["ha_actions"]["200"])
+    aioclient_mock.post(
+        f"{API}/ha/actions/41/result", json=contract["ha_action_result"]["200"]
+    )
+    aioclient_mock.post(
+        f"{API}/ha/actions/42/result", json=contract["ha_action_result"]["200"]
+    )
+    aioclient_mock.get(f"{API}/ha/rules", json=contract["ha_rules"]["200"])
+    aioclient_mock.post(f"{API}/ha/rules/3/fire", json=contract["ha_rule_fire"]["200"])
+    aioclient_mock.post(
+        f"{API}/ha/rules/7/state", json=contract["ha_rule_state"]["200"]
+    )
+    aioclient_mock.get(f"{API}/ha/scenes", json=contract["ha_scenes"]["200"])
+
+    catalog = contract["ha_catalog"]["request"]
+    assert await client.ha_catalog(catalog) == contract["ha_catalog"]["200"]
+    assert await client.ha_actions() == contract["ha_actions"]["200"]
+    await client.ha_action_result(41, words="Kitchen flashed")
+    await client.ha_action_result(42, error="light.kitchen is unavailable")
+    assert await client.ha_rules() == contract["ha_rules"]["200"]
+    fire = contract["ha_rule_fire"]["request"]
+    assert (
+        await client.ha_rule_fire(3, fire["at"], fire["event"])
+        == (contract["ha_rule_fire"]["200"])
+    )
+    await client.ha_rule_state(7, contract["ha_rule_state"]["request"]["error"])
+    assert await client.ha_scenes() == contract["ha_scenes"]["200"]
+
+    assert [json.loads(c[2]) for c in calls(aioclient_mock, "put", "/ha/catalog")] == [
+        catalog
+    ]
+    [(_, _, ok, _)] = calls(aioclient_mock, "post", "/ha/actions/41/result")
+    [(_, _, failed, _)] = calls(aioclient_mock, "post", "/ha/actions/42/result")
+    assert json.loads(ok) == contract["ha_action_result"]["request_ok"]
+    assert json.loads(failed) == contract["ha_action_result"]["request_failed"]
+    [(_, rules_url, _, _)] = calls(aioclient_mock, "get", "/ha/rules")
+    assert rules_url.query["kind"] == "from_ha"
+    [(_, _, fired, _)] = calls(aioclient_mock, "post", "/ha/rules/3/fire")
+    assert json.loads(fired) == fire
+    [(_, _, state, _)] = calls(aioclient_mock, "post", "/ha/rules/7/state")
+    assert json.loads(state) == contract["ha_rule_state"]["request"]
+    for _, _, body, headers in aioclient_mock.mock_calls:
+        assert headers["X-Logger-Client"] == "ha"
+        assert "Origin" not in headers
+        if body is not None:
+            assert headers["Content-Type"] == "application/json"
+            assert "tz" not in json.loads(body)
+
+
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [(409, LoggerRefused), (404, LoggerRefused), (502, LoggerConnectionError)],
+)
+async def test_ha_result_answers(
+    client: LoggerClient,
+    aioclient_mock: AiohttpClientMocker,
+    contract: dict[str, Any],
+    status: int,
+    error: type[Exception],
+) -> None:
+    """409 = answered already (the contract's words), 404 = gone; a proxy's 502 = no
+    answer."""
+    answer = (
+        {"json": contract["ha_action_result"]["409"]}
+        if status == 409
+        else {"json": {"ok": False, "error": "No action #9"}}
+        if status == 404
+        else {"text": "<html>Bad Gateway</html>"}
+    )
+    aioclient_mock.post(f"{API}/ha/actions/9/result", status=status, **answer)
+    with pytest.raises(error) as err:
+        await client.ha_action_result(9, words="done")
+    assert err.value.status == status

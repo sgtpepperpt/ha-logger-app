@@ -10,6 +10,9 @@ backend/tests/fixtures/ha_contract.json). Logger's rules for a client:
   caller's zone decides what "today" is;
 - 2xx = done (202 = queued until Nextcloud answers, still done); a refusal carries Logger's
   sentence in `error` (or `words`) and nothing was written.
+
+The `/ha/*` routes (rules + scenes, only when `/about.features` has "rules") are the
+integration's own channel: their bodies are exactly the contract's (`ha_*` keys), no `tz`.
 """
 
 from __future__ import annotations
@@ -50,11 +53,14 @@ class LoggerRefused(LoggerError):
 
 @dataclass(frozen=True, slots=True)
 class About:
-    """`GET /api/about`: which Logger this is and which contract it speaks."""
+    """`GET /api/about`: which Logger this is and which contract it speaks. `features` =
+    what this Logger offers beyond the polled contract ("rules": rules + scenes, F39); an
+    older Logger sends none."""
 
     api: int
     instance_id: str
     code: str | None
+    features: tuple[str, ...] = ()
 
 
 def normalize_url(raw: str) -> str:
@@ -88,7 +94,15 @@ class LoggerClient:
         if not _is_int(api) or not isinstance(instance_id, str) or not instance_id:
             raise LoggerConnectionError(NOT_LOGGER)
         code = body.get("code")
-        return About(api, instance_id, code if isinstance(code, str) else None)
+        features = body.get("features")
+        return About(
+            api,
+            instance_id,
+            code if isinstance(code, str) else None,
+            tuple(f for f in features if isinstance(f, str))
+            if isinstance(features, list)
+            else (),
+        )
 
     async def status(self) -> dict[str, Any]:
         return _object(await self._call("GET", "/status", params={"tz": self.tz}))
@@ -132,6 +146,62 @@ class LoggerClient:
         wake (both refusals with words)."""
         return _object(await self._call("POST", "/tablet/wake", body={}))
 
+    # Rules + scenes (F39): Logger decides, Home Assistant runs. Shapes = the contract's
+    # `ha_*` keys; every body is sent exactly as there (no `tz`).
+
+    async def ha_catalog(self, catalog: dict[str, Any]) -> dict[str, Any]:
+        """What HA has → `{ok, at, counts, webhook, webhook_error}`."""
+        return _object(await self._call("PUT", "/ha/catalog", body=catalog, tz=False))
+
+    async def ha_actions(self) -> dict[str, Any]:
+        """The waiting actions (Logger marks them taken: each comes once) + the revs →
+        `{actions, rules_rev, scenes_rev, catalog_at, catalog_wanted}`."""
+        return _object(await self._call("GET", "/ha/actions"))
+
+    async def ha_action_result(
+        self, action_id: int, *, words: str | None = None, error: str | None = None
+    ) -> dict[str, Any]:
+        """How an action went: `{ok: true, words}` or `{ok: false, error}`; 409 = it was
+        answered already, 404 = gone (both LoggerRefused)."""
+        body: dict[str, Any] = (
+            {"ok": False, "error": error}
+            if error is not None
+            else {"ok": True, "words": words}
+        )
+        return _object(
+            await self._call(
+                "POST", f"/ha/actions/{action_id}/result", body=body, tz=False
+            )
+        )
+
+    async def ha_rules(self) -> dict[str, Any]:
+        """The HA → Logger rules: `{rev, rules}` (`kind=from_ha`)."""
+        return _object(await self._call("GET", "/ha/rules", params={"kind": "from_ha"}))
+
+    async def ha_rule_fire(self, rule_id: int, at: str, event: str) -> dict[str, Any]:
+        """A rule's HA trigger happened → `{ok, ran, skipped, words, error?}`; Logger runs
+        the rule's actions itself and drops a repeated `event`. 404 = no such rule."""
+        return _object(
+            await self._call(
+                "POST",
+                f"/ha/rules/{rule_id}/fire",
+                body={"at": at, "event": event},
+                tz=False,
+            )
+        )
+
+    async def ha_rule_state(self, rule_id: int, error: str | None) -> dict[str, Any]:
+        """A rule's registration outcome: `error` = HA's refusal, None = registered."""
+        return _object(
+            await self._call(
+                "POST", f"/ha/rules/{rule_id}/state", body={"error": error}, tz=False
+            )
+        )
+
+    async def ha_scenes(self) -> dict[str, Any]:
+        """Logger's scenes: `{rev, scenes}`."""
+        return _object(await self._call("GET", "/ha/scenes"))
+
     async def _call(
         self,
         method: str,
@@ -139,12 +209,13 @@ class LoggerClient:
         *,
         params: dict[str, str] | None = None,
         body: dict[str, Any] | None = None,
+        tz: bool = True,
     ) -> Any:
         headers = {CLIENT_HEADER: CLIENT}
         data = None
         if body is not None:
             headers["Content-Type"] = "application/json"
-            data = json.dumps({**body, "tz": self.tz})
+            data = json.dumps({**body, "tz": self.tz} if tz else body)
         try:
             async with self._session.request(
                 method,

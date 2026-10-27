@@ -3,11 +3,12 @@
   "name": "Logger",
   "codeowners": ["@sgtpepperpt"],
   "config_flow": true,
+  "dependencies": ["webhook"],
   "documentation": "https://github.com/sgtpepperpt/ha-logger-app",
   "integration_type": "service",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/sgtpepperpt/ha-logger-app/issues",
   "loggers": ["custom_components.logger_app"],
   "requirements": [],
-  "version": "2026.10.0"
+  "version": "2026.10.1"
 }
