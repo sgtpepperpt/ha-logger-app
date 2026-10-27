@@ -1,0 +1,61 @@
+fire:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: logger_app
+    entry:
+      required: true
+      example: Café
+      selector:
+        text:
+    text:
+      example: Café with Ana
+      selector:
+        text:
+    note:
+      selector:
+        text:
+          multiline: true
+    kcal:
+      example: 500
+      selector:
+        number:
+          min: 0
+          max: 20000
+          step: 1
+          mode: box
+          unit_of_measurement: kcal
+    at:
+      selector:
+        datetime:
+
+shopping_add:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: logger_app
+    name:
+      required: true
+      example: Leite
+      selector:
+        text:
+    qty:
+      example: 2 l
+      selector:
+        text:
+    shop:
+      example: Continente
+      selector:
+        text:
+    due:
+      selector:
+        date:
+
+tablet_wake:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: logger_app

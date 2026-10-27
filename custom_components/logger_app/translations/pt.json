@@ -1,0 +1,190 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "O endereço do Logger na rede local, `{lan}` — o Logger mostra-o em Definições → Home Assistant.",
+        "data": {
+          "url": "Endereço"
+        },
+        "data_description": {
+          "url": "A porta da rede local, 4173. Nunca o endereço público: responde com a página de entrada."
+        }
+      },
+      "reconfigure": {
+        "description": "Um novo endereço para o mesmo Logger (o instance id é verificado): `{lan}`.",
+        "data": {
+          "url": "Endereço"
+        },
+        "data_description": {
+          "url": "A porta da rede local, 4173. Nunca o endereço público: responde com a página de entrada."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Falha ao ligar: nenhum Logger respondeu neste endereço. Use o endereço da rede local (porta 4173) — o endereço público responde com a página de entrada.",
+      "invalid_url": "Não é um endereço http ou https."
+    },
+    "abort": {
+      "already_configured": "Este Logger (o seu instance id) já está configurado. Para um novo endereço: Reconfigurar.",
+      "reconfigure_successful": "A reconfiguração foi bem-sucedida",
+      "unsupported_api": "Este Logger fala a API {api}; esta integração conhece até à {max}. Atualize a integração no HACS.",
+      "wrong_logger": "Este endereço responde como outro Logger (outro instance id)."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Intervalo de leitura",
+          "tz": "Fuso horário",
+          "alerts": "Alertas"
+        },
+        "data_description": {
+          "scan_interval": "De quanto em quanto tempo o Logger é lido, em segundos (15–600).",
+          "tz": "Decide o que é “hoje” nas respostas e escritas do Logger. O do Home Assistant por omissão.",
+          "alerts": "Ler os problemas do Logger para o sensor Problemas."
+        }
+      }
+    },
+    "error": {
+      "invalid_tz": "Não é um fuso horário (p. ex. Europe/Lisbon)."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "free_kcal": { "name": "kcal livres" },
+      "eaten_kcal": { "name": "kcal comidas" },
+      "planned_kcal": { "name": "kcal planeadas" },
+      "goal_kcal": { "name": "kcal objetivo" },
+      "banked_kcal": { "name": "kcal no banco" },
+      "glucose": { "name": "Glicose" },
+      "medication_overdue": { "name": "Medicação em atraso" },
+      "medication_due": { "name": "Medicação a tomar" },
+      "medication_next": { "name": "Próxima medicação" },
+      "care_overdue": { "name": "Cuidados em atraso" },
+      "care_due": { "name": "Cuidados a fazer" },
+      "steps_today": { "name": "Passos hoje" },
+      "tasks_overdue": { "name": "Tarefas em atraso" },
+      "tasks_today": { "name": "Tarefas hoje" },
+      "tasks_waiting": { "name": "Tarefas em espera" },
+      "deliveries_overdue": { "name": "Entregas em atraso" },
+      "deliveries_today": { "name": "Entregas hoje" },
+      "problems": { "name": "Problemas" },
+      "refill_soon": { "name": "Reabastecer em breve" },
+      "sensor_day": { "name": "Dia do sensor" },
+      "sensor_ends": { "name": "Fim do sensor" }
+    },
+    "binary_sensor": {
+      "medication_overdue": { "name": "Medicação em atraso" },
+      "tasks_overdue": { "name": "Tarefas em atraso" },
+      "glucose_low": { "name": "Glicose baixa" },
+      "glucose_stale": { "name": "Glicose desatualizada" },
+      "tasks_read_only": { "name": "Tarefas só de leitura" },
+      "sensor_ending_soon": { "name": "Sensor a terminar" }
+    },
+    "button": {
+      "tablet_wake": { "name": "Acordar o tablet" },
+      "refresh": { "name": "Atualizar" }
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Não foi possível contactar o Logger: {words}"
+    },
+    "refused": {
+      "message": "Logger: {words}"
+    },
+    "update_failed": {
+      "message": "A leitura do Logger falhou: {words}"
+    },
+    "wrong_logger": {
+      "message": "Este endereço responde como outro Logger ({found}). Reconfigure a entrada com o endereço deste Logger."
+    },
+    "unsupported_api": {
+      "message": "Este Logger fala a API {api}; esta integração conhece até à {max}. Atualize a integração no HACS."
+    },
+    "not_loaded": {
+      "message": "Nenhuma entrada do Logger carregada com o id {entry_id}."
+    },
+    "no_logger": {
+      "message": "Nenhum Logger configurado ou carregado."
+    },
+    "which_logger": {
+      "message": "Há vários Loggers configurados: indique um com config_entry_id."
+    },
+    "no_quick_entry": {
+      "message": "O Logger não tem a entrada rápida “{entry}” (indique o id ou o nome exato)."
+    },
+    "ambiguous_quick_entry": {
+      "message": "Há várias entradas rápidas chamadas “{entry}”: indique o id."
+    }
+  },
+  "services": {
+    "fire": {
+      "name": "Disparar uma entrada rápida",
+      "description": "Dispara uma das entradas rápidas do Logger (Definições → Entradas rápidas), como o seu botão — com as alterações desta chamada.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Logger",
+          "description": "Qual Logger; o único configurado quando vazio."
+        },
+        "entry": {
+          "name": "Entrada rápida",
+          "description": "O id, ou o nome exato."
+        },
+        "text": {
+          "name": "Texto",
+          "description": "Só nesta vez: o texto de uma nota do diário, o rótulo de kcal planeadas, o artigo de uma compra."
+        },
+        "note": {
+          "name": "Nota",
+          "description": "Só nesta vez: a nota que leva."
+        },
+        "kcal": {
+          "name": "kcal",
+          "description": "Só nesta vez: o número de kcal planeadas."
+        },
+        "at": {
+          "name": "Quando",
+          "description": "Antedata uma nota do diário, um registo de sintomas ou kcal planeadas; uma hora sem fuso é a do fuso da entrada."
+        }
+      }
+    },
+    "shopping_add": {
+      "name": "Adicionar à lista de compras",
+      "description": "Junta um artigo à lista de compras do Logger (a lista do Nextcloud que o Logger escreve). À espera do Nextcloud também conta como feito.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Logger",
+          "description": "Qual Logger; o único configurado quando vazio."
+        },
+        "name": {
+          "name": "Artigo",
+          "description": "O que comprar."
+        },
+        "qty": {
+          "name": "Quantidade",
+          "description": "Quanto, em palavras."
+        },
+        "shop": {
+          "name": "Loja",
+          "description": "Onde comprar."
+        },
+        "due": {
+          "name": "Até",
+          "description": "Necessário até este dia."
+        }
+      }
+    },
+    "tablet_wake": {
+      "name": "Acordar o tablet",
+      "description": "Acorda o tablet da cozinha (Logger → Definições → Tablet).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Logger",
+          "description": "Qual Logger; o único configurado quando vazio."
+        }
+      }
+    }
+  }
+}

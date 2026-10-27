@@ -1,0 +1,49 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1"  # weekly: the latest-HA job catches upstream breakage
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - run: pip install "$(grep '^ruff==' requirements_test.txt)"
+      - run: ruff check .
+      - run: ruff format --check .
+
+  pytest:
+    name: pytest (HA ${{ matrix.ha }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The minimum HA (hacs.json) = the user's HA; requirements_test.txt pins it.
+          - ha: 2026.2.3
+            python: "3.13"
+            install: -r requirements_test.txt
+          # Whatever HA is newest: the integration must keep working after an upgrade.
+          - ha: latest
+            python: "3.14"
+            install: pytest-homeassistant-custom-component
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+      - run: pip install ${{ matrix.install }}
+      - run: pytest

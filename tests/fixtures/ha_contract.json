@@ -1,0 +1,437 @@
+{
+  "doc": "The Home Assistant integration's contract with Logger (logger_app, github.com/sgtpepperpt/ha-logger-app; docs/home-assistant.md): one example answer of every route it reads — GET /about, GET /status?tz=, GET /quick (one entry of each kind), POST /quick/<id>/fire (201, and a med tick's 409 with `already`), POST /shopping (201, and 202 = queued while Nextcloud is down), POST /tablet/wake (200, and 409 = not set up), GET /alerts — keyed by HTTP status where a route has two. backend/tests/test_ha_contract.py checks every key path here against what the server answers, with the same JSON type (null = the key is nullable); the integration's tests parse a copy. A key the server adds never breaks the integration and never bumps `about.api`; a key it reads renamed, removed or retyped does both. `status.food` = status_parity.json's first case (25 Oct 13:30Z, Lisbon). `status.changes` is keyed by data: one key per kind written so far (food, body, blood, journal, meds, goals, pressure, workouts, tasks). Null means unknown, never 0: no calorie goal, no medication today, Tasks off. Instants are ISO 8601 with an offset; the caller's `tz` decides every day.",
+  "about": {
+    "name": "Logger",
+    "api": 1,
+    "instance_id": "7c1e5f0a-3b9d-4e2a-9f61-0d4b8a2c6e35",
+    "code": "3f2a9c1d7e4b"
+  },
+  "status": {
+    "as_of": "2026-10-25T13:30:00.418204+00:00",
+    "day": "2026-10-25",
+    "day_start_minutes": 300,
+    "food": {
+      "goal": 2100,
+      "base_goal": 2100,
+      "banked": 372,
+      "balance": 372,
+      "eaten": 1161,
+      "planned": 864,
+      "free": 75
+    },
+    "glucose": {
+      "mgdl": 94,
+      "direction": "FortyFiveDown",
+      "at": "2026-10-25T13:27:00+00:00",
+      "source": "nightscout",
+      "low": 70,
+      "high": 180,
+      "trace": [
+        [
+          -178,
+          112
+        ],
+        [
+          -118,
+          104
+        ],
+        [
+          -58,
+          99
+        ],
+        [
+          -3,
+          94
+        ]
+      ],
+      "sensor": {
+        "started": "2026-10-23T13:47:12+00:00",
+        "ends": "2026-11-07T13:47:12+00:00",
+        "day": 3,
+        "of": 15,
+        "serial": null,
+        "via": "detected",
+        "source": null,
+        "id": 15022,
+        "ending_soon": false,
+        "expired": false,
+        "words": "day 3 of 15 · ends Sat 7 Nov 13:47"
+      }
+    },
+    "medication": {
+      "expected": 3,
+      "taken": 0,
+      "overdue": [
+        {
+          "key": "1|2026-10-25T08:00:00+00:00",
+          "p": 1,
+          "name": "Omega-3",
+          "kind": "product",
+          "box": false,
+          "due": {
+            "from": "2026-10-25T08:00:00+00:00",
+            "by": "2026-10-25T08:00:00+00:00"
+          },
+          "slot": {
+            "at": "08:00"
+          },
+          "grace_min": 60,
+          "period": "Morning",
+          "words": "1 tab",
+          "dose": 1.0,
+          "amount": null,
+          "form": "tab",
+          "state": "overdue"
+        }
+      ],
+      "due": [
+        {
+          "key": "2|2026-10-25T13:00:00+00:00",
+          "p": 2,
+          "name": "Vitamin D",
+          "kind": "product",
+          "box": false,
+          "due": {
+            "from": "2026-10-25T13:00:00+00:00",
+            "by": "2026-10-25T13:00:00+00:00"
+          },
+          "slot": {
+            "at": "13:00"
+          },
+          "grace_min": 60,
+          "period": "Afternoon",
+          "words": "1 tab",
+          "dose": 1.0,
+          "amount": null,
+          "form": "tab",
+          "state": "due"
+        }
+      ],
+      "next": {
+        "key": "3|2026-10-25T21:00:00+00:00",
+        "p": 3,
+        "name": "Magnesium",
+        "kind": "product",
+        "box": false,
+        "due": {
+          "from": "2026-10-25T21:00:00+00:00",
+          "by": "2026-10-25T21:00:00+00:00"
+        },
+        "slot": {
+          "at": "21:00"
+        },
+        "grace_min": 60,
+        "period": "Night",
+        "words": "1 tab",
+        "dose": 1.0,
+        "amount": null,
+        "form": "tab",
+        "state": "next"
+      },
+      "later": 1,
+      "overdue_rows": 1,
+      "due_rows": 1,
+      "optional_late": 0
+    },
+    "care": {
+      "expected": 2,
+      "taken": 0,
+      "overdue": [],
+      "due": [
+        {
+          "key": "5|2026-10-25T13:15:00+00:00",
+          "p": 5,
+          "name": "Stretch",
+          "kind": "product",
+          "box": false,
+          "due": {
+            "from": "2026-10-25T13:15:00+00:00",
+            "by": "2026-10-25T13:15:00+00:00"
+          },
+          "slot": {
+            "at": "13:15"
+          },
+          "grace_min": 60,
+          "period": "Afternoon",
+          "words": "",
+          "dose": 1.0,
+          "amount": null,
+          "form": "check",
+          "state": "due"
+        }
+      ],
+      "next": {
+        "key": "4|2026-10-25T22:00:00+00:00",
+        "p": 4,
+        "name": "Lenses out",
+        "kind": "product",
+        "box": false,
+        "due": {
+          "from": "2026-10-25T22:00:00+00:00",
+          "by": "2026-10-25T22:00:00+00:00"
+        },
+        "slot": {
+          "at": "22:00"
+        },
+        "grace_min": 60,
+        "period": "Night",
+        "words": "",
+        "dose": 1.0,
+        "amount": null,
+        "form": "check",
+        "state": "next"
+      },
+      "later": 1,
+      "overdue_rows": 0,
+      "due_rows": 1,
+      "optional_late": 0
+    },
+    "steps": {
+      "today": 6234,
+      "day": "2026-10-25",
+      "as_of": "2026-10-25T13:20:00+00:00"
+    },
+    "tasks": {
+      "overdue": 1,
+      "today": 1,
+      "deliveries": {
+        "overdue": 0,
+        "today": 1
+      },
+      "waiting": 2,
+      "read_only": false,
+      "rows": [
+        {
+          "id": 71,
+          "summary": "Call the clinic",
+          "due": "2026-10-25T11:30:00+00:00",
+          "list": "home",
+          "words": "11:30",
+          "kind": "task",
+          "overdue": true
+        },
+        {
+          "id": 80,
+          "summary": "Shoes",
+          "due": "2026-10-25",
+          "list": "deliveries",
+          "words": "today",
+          "kind": "delivery",
+          "overdue": false
+        },
+        {
+          "id": 72,
+          "summary": "Water the plants",
+          "due": "2026-10-25",
+          "list": "home",
+          "words": "today",
+          "kind": "task",
+          "overdue": false
+        }
+      ]
+    },
+    "refill": {
+      "soon": [
+        {
+          "p": 902,
+          "name": "Omega-3",
+          "days_left": 6,
+          "refill_by": "2026-10-29",
+          "approx": false
+        }
+      ],
+      "n": 1
+    },
+    "changes": {
+      "food": 4812,
+      "journal": 4790,
+      "meds": 4811,
+      "tasks": 4805
+    }
+  },
+  "quick": [
+    {
+      "id": 12,
+      "name": "Café",
+      "icon": "coffee",
+      "order": 0,
+      "kind": "diary",
+      "body": {
+        "text": "Café",
+        "tags": [
+          4
+        ]
+      },
+      "about": "#café",
+      "missing_tags": []
+    },
+    {
+      "id": 31,
+      "name": "Felt a drop",
+      "icon": "drop",
+      "order": 1,
+      "kind": "symptom",
+      "body": {
+        "readings": [
+          {
+            "p": 968,
+            "level": 2
+          }
+        ]
+      },
+      "about": "glucose drop 2",
+      "missing_tags": []
+    },
+    {
+      "id": 13,
+      "name": "Lunch out",
+      "icon": "utensils",
+      "order": 2,
+      "kind": "placeholder",
+      "body": {
+        "name": "Lunch out",
+        "kcal": 700
+      },
+      "about": "≈700 kcal",
+      "missing_tags": []
+    },
+    {
+      "id": 20,
+      "name": "Morning box",
+      "icon": "pill",
+      "order": 3,
+      "kind": "intake",
+      "body": {
+        "p": 917,
+        "slot": "next_owed"
+      },
+      "about": "next owed",
+      "missing_tags": []
+    },
+    {
+      "id": 16,
+      "name": "Home",
+      "icon": "house",
+      "order": 4,
+      "kind": "task_nudge",
+      "body": {
+        "tag": "casa"
+      },
+      "about": "tasks #casa",
+      "missing_tags": []
+    },
+    {
+      "id": 21,
+      "name": "Shopping",
+      "icon": "cart",
+      "order": 5,
+      "kind": "shopping_add",
+      "body": {},
+      "about": "+ what is said",
+      "missing_tags": []
+    }
+  ],
+  "fire": {
+    "201": {
+      "ok": true,
+      "words": "Diary: Café",
+      "ids": [
+        812
+      ],
+      "kind": "diary",
+      "name": "Café",
+      "path": "/diary?entry=812"
+    },
+    "409": {
+      "ok": false,
+      "error": "already taken: Omega-3, Zinc",
+      "already": [
+        "Omega-3",
+        "Zinc"
+      ]
+    }
+  },
+  "shopping": {
+    "201": {
+      "ok": true,
+      "item": {
+        "id": 91,
+        "name": "Leite",
+        "qty": "2 l",
+        "section": null,
+        "shop": "Continente",
+        "order": 814712480,
+        "food_ref": null,
+        "due": null,
+        "due_words": null,
+        "bought_at": null
+      }
+    },
+    "202": {
+      "ok": true,
+      "item": {
+        "id": 92,
+        "name": "Pão",
+        "qty": null,
+        "section": null,
+        "shop": null,
+        "order": 814712481,
+        "food_ref": null,
+        "due": {
+          "date": "2026-10-27",
+          "time": null
+        },
+        "due_words": "Tue",
+        "bought_at": null
+      },
+      "queued": true
+    }
+  },
+  "tablet_wake": {
+    "200": {
+      "ok": true,
+      "outcome": "woken_push",
+      "words": "Woken — one swipe opens it.",
+      "at": "2026-10-25T13:30:02+00:00",
+      "push": {
+        "reached": 1,
+        "tablets": 1
+      },
+      "ssh": null
+    },
+    "409": {
+      "ok": false,
+      "outcome": "no_tablet",
+      "words": "No tablet gets Logger’s notifications yet — open the Logger app on the tablet once.",
+      "at": "2026-10-25T13:30:02+00:00",
+      "push": {
+        "reached": 0,
+        "tablets": 0
+      },
+      "ssh": null,
+      "error": "No tablet gets Logger’s notifications yet — open the Logger app on the tablet once."
+    }
+  },
+  "alerts": {
+    "alerts": [
+      {
+        "id": "tasks.queued",
+        "severity": "warn",
+        "text": "3 changes waiting for Nextcloud since 10:30 — saving the task: HTTP 502.",
+        "where": "Settings → Tasks",
+        "href": "/settings?tab=tasks",
+        "action": {
+          "label": "Sync now",
+          "kind": "tasks.sync"
+        }
+      },
+      {
+        "id": "tasks.needs_you",
+        "severity": "warn",
+        "text": "1 Tasks change meets one made on the server meanwhile — open the task to apply yours again or drop it.",
+        "where": "Tasks",
+        "href": "/tasks"
+      }
+    ]
+  }
+}

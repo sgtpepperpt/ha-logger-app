@@ -1,0 +1,9 @@
+# local virtualenvs (.venv = min HA, .venv-latest = newest HA)
+.venv*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.DS_Store

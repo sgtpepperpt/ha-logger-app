@@ -1,0 +1,61 @@
+{
+  "entity": {
+    "sensor": {
+      "free_kcal": { "default": "mdi:food-apple-outline" },
+      "eaten_kcal": { "default": "mdi:silverware-fork-knife" },
+      "planned_kcal": { "default": "mdi:calendar-clock" },
+      "goal_kcal": { "default": "mdi:target" },
+      "banked_kcal": { "default": "mdi:piggy-bank-outline" },
+      "medication_overdue": { "default": "mdi:pill-off" },
+      "medication_due": { "default": "mdi:pill" },
+      "medication_next": { "default": "mdi:pill-multiple" },
+      "care_overdue": { "default": "mdi:clipboard-alert-outline" },
+      "care_due": { "default": "mdi:clipboard-check-outline" },
+      "steps_today": { "default": "mdi:walk" },
+      "tasks_overdue": { "default": "mdi:checkbox-marked-circle-auto-outline" },
+      "tasks_today": { "default": "mdi:checkbox-marked-circle-outline" },
+      "tasks_waiting": { "default": "mdi:cloud-upload-outline" },
+      "deliveries_overdue": { "default": "mdi:package-variant-closed-remove" },
+      "deliveries_today": { "default": "mdi:package-variant-closed" },
+      "problems": { "default": "mdi:alert-circle-outline" },
+      "refill_soon": { "default": "mdi:pill-multiple" },
+      "sensor_day": { "default": "mdi:radiobox-marked" },
+      "sensor_ends": { "default": "mdi:timer-sand" }
+    },
+    "binary_sensor": {
+      "medication_overdue": {
+        "default": "mdi:pill",
+        "state": { "on": "mdi:pill-off" }
+      },
+      "tasks_overdue": {
+        "default": "mdi:checkbox-marked-circle-outline",
+        "state": { "on": "mdi:checkbox-marked-circle-auto-outline" }
+      },
+      "glucose_low": {
+        "default": "mdi:water-check",
+        "state": { "on": "mdi:water-alert" }
+      },
+      "glucose_stale": {
+        "default": "mdi:access-point",
+        "state": { "on": "mdi:access-point-off" }
+      },
+      "tasks_read_only": {
+        "default": "mdi:pencil",
+        "state": { "on": "mdi:pencil-off" }
+      },
+      "sensor_ending_soon": {
+        "default": "mdi:radiobox-marked",
+        "state": { "on": "mdi:timer-sand-complete" }
+      }
+    },
+    "button": {
+      "tablet_wake": { "default": "mdi:tablet" },
+      "refresh": { "default": "mdi:refresh" }
+    }
+  },
+  "services": {
+    "fire": { "service": "mdi:gesture-tap-button" },
+    "shopping_add": { "service": "mdi:cart-plus" },
+    "tablet_wake": { "service": "mdi:tablet" }
+  }
+}

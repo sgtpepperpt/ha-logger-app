@@ -1,0 +1,190 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Logger's LAN address, `{lan}` — Logger → Settings → Home Assistant shows the one to paste.",
+        "data": {
+          "url": "Address"
+        },
+        "data_description": {
+          "url": "The LAN port, 4173. Never the public address: it answers with a sign-in page."
+        }
+      },
+      "reconfigure": {
+        "description": "A new address for the same Logger (its instance id is checked): `{lan}`.",
+        "data": {
+          "url": "Address"
+        },
+        "data_description": {
+          "url": "The LAN port, 4173. Never the public address: it answers with a sign-in page."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect: no Logger answered at this address. Use its LAN address (port 4173) — the public address answers with a sign-in page.",
+      "invalid_url": "Not an http or https address."
+    },
+    "abort": {
+      "already_configured": "This Logger (its instance id) is set up already. A new address for it: Reconfigure.",
+      "reconfigure_successful": "Re-configuration was successful",
+      "unsupported_api": "This Logger speaks API {api}; this integration knows up to {max}. Update the integration in HACS.",
+      "wrong_logger": "This address answers as another Logger (a different instance id)."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Scan interval",
+          "tz": "Time zone",
+          "alerts": "Alerts"
+        },
+        "data_description": {
+          "scan_interval": "How often Logger is read, in seconds (15–600).",
+          "tz": "Decides what “today” is in Logger's answers and writes. Home Assistant's own by default.",
+          "alerts": "Read Logger's problems into the Problems sensor."
+        }
+      }
+    },
+    "error": {
+      "invalid_tz": "Not a time zone (e.g. Europe/Lisbon)."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "free_kcal": { "name": "Free kcal" },
+      "eaten_kcal": { "name": "Eaten kcal" },
+      "planned_kcal": { "name": "Planned kcal" },
+      "goal_kcal": { "name": "Goal kcal" },
+      "banked_kcal": { "name": "Banked kcal" },
+      "glucose": { "name": "Glucose" },
+      "medication_overdue": { "name": "Medication overdue" },
+      "medication_due": { "name": "Medication due" },
+      "medication_next": { "name": "Medication next" },
+      "care_overdue": { "name": "Care overdue" },
+      "care_due": { "name": "Care due" },
+      "steps_today": { "name": "Steps today" },
+      "tasks_overdue": { "name": "Tasks overdue" },
+      "tasks_today": { "name": "Tasks today" },
+      "tasks_waiting": { "name": "Tasks waiting" },
+      "deliveries_overdue": { "name": "Deliveries overdue" },
+      "deliveries_today": { "name": "Deliveries today" },
+      "problems": { "name": "Problems" },
+      "refill_soon": { "name": "Refill soon" },
+      "sensor_day": { "name": "Sensor day" },
+      "sensor_ends": { "name": "Sensor ends" }
+    },
+    "binary_sensor": {
+      "medication_overdue": { "name": "Medication overdue" },
+      "tasks_overdue": { "name": "Tasks overdue" },
+      "glucose_low": { "name": "Glucose low" },
+      "glucose_stale": { "name": "Glucose stale" },
+      "tasks_read_only": { "name": "Tasks read only" },
+      "sensor_ending_soon": { "name": "Sensor ending soon" }
+    },
+    "button": {
+      "tablet_wake": { "name": "Tablet wake" },
+      "refresh": { "name": "Refresh" }
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Logger couldn't be reached: {words}"
+    },
+    "refused": {
+      "message": "Logger: {words}"
+    },
+    "update_failed": {
+      "message": "Reading Logger failed: {words}"
+    },
+    "wrong_logger": {
+      "message": "This address answers as another Logger ({found}). Reconfigure the entry with this Logger's address."
+    },
+    "unsupported_api": {
+      "message": "This Logger speaks API {api}; this integration knows up to {max}. Update the integration in HACS."
+    },
+    "not_loaded": {
+      "message": "No loaded Logger entry {entry_id}."
+    },
+    "no_logger": {
+      "message": "No Logger is set up or loaded."
+    },
+    "which_logger": {
+      "message": "Several Loggers are set up: name one with config_entry_id."
+    },
+    "no_quick_entry": {
+      "message": "Logger has no quick entry “{entry}” (give its id or its exact name)."
+    },
+    "ambiguous_quick_entry": {
+      "message": "Several quick entries are named “{entry}”: give its id."
+    }
+  },
+  "services": {
+    "fire": {
+      "name": "Fire a quick entry",
+      "description": "Fires one of Logger's quick entries (Logger → Settings → Quick entries), as its button does — with this call's changes.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Logger",
+          "description": "Which Logger; the only one set up when left empty."
+        },
+        "entry": {
+          "name": "Quick entry",
+          "description": "Its id, or its exact name."
+        },
+        "text": {
+          "name": "Text",
+          "description": "This fire only: a diary note's text, a planned kcal's label, a shopping add's item."
+        },
+        "note": {
+          "name": "Note",
+          "description": "This fire only: the note it carries."
+        },
+        "kcal": {
+          "name": "kcal",
+          "description": "This fire only: a planned kcal's number."
+        },
+        "at": {
+          "name": "At",
+          "description": "Backdates a diary note, a check-in or planned kcal; a time without a zone is on the entry's time zone."
+        }
+      }
+    },
+    "shopping_add": {
+      "name": "Add to the shopping list",
+      "description": "Adds one item to Logger's shopping list (the Nextcloud list Logger writes). Waiting for Nextcloud still counts as done.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Logger",
+          "description": "Which Logger; the only one set up when left empty."
+        },
+        "name": {
+          "name": "Item",
+          "description": "What to buy."
+        },
+        "qty": {
+          "name": "Quantity",
+          "description": "How much, in words."
+        },
+        "shop": {
+          "name": "Shop",
+          "description": "Where to buy it."
+        },
+        "due": {
+          "name": "Due",
+          "description": "Wanted by this day."
+        }
+      }
+    },
+    "tablet_wake": {
+      "name": "Wake the tablet",
+      "description": "Wakes the kitchen tablet (Logger → Settings → Tablet).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Logger",
+          "description": "Which Logger; the only one set up when left empty."
+        }
+      }
+    }
+  }
+}

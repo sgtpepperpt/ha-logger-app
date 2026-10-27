@@ -1,0 +1,4 @@
+# Tests run against the minimum HA (2026.2.3 = the user's HA; see CLAUDE.md). One pin per HA
+# release: pytest-homeassistant-custom-component 0.13.316 ships homeassistant==2026.2.3.
+pytest-homeassistant-custom-component==0.13.316
+ruff==0.17.2
