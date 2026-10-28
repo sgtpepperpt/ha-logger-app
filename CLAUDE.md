@@ -12,6 +12,8 @@ too when it has pending work. Spec: Logger's
 this README's tables — keep them consistent; when they must differ, tell the user what to change
 there).
 
+Run command (no server of its own: it runs inside Home Assistant; on the Mac = its tests): `cd ~/Documents/Repositories/ha-logger-app && .venv/bin/python -m pytest -q`
+
 ## Decided
 
 - **Min HA 2026.2** (user's HA = 2026.2.3 and can't upgrade; decided 2026-10-26). Consequences,

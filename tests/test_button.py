@@ -228,7 +228,7 @@ async def test_tablet_wake(
     assert events[0].data == {
         "kind": "tablet_wake",
         "name": None,
-        "words": "Woken — one swipe opens it.",
+        "words": "Woken. One swipe opens it.",
     }
 
 

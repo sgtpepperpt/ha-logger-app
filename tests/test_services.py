@@ -119,7 +119,7 @@ async def test_fire_refused(
         status=400,
         json={
             "ok": False,
-            "error": "at does not apply to a med tick — it answers the dose owed now, taken now",
+            "error": "at does not apply to a med tick: it answers the dose owed now, taken now",
         },
     )
     await setup_entry(hass, config_entry)
@@ -195,7 +195,7 @@ async def test_tablet_wake(
     await setup_entry(hass, config_entry)
     assert await call(hass, SERVICE_TABLET_WAKE, {}) == {
         "outcome": "woken_push",
-        "words": "Woken — one swipe opens it.",
+        "words": "Woken. One swipe opens it.",
     }
 
 

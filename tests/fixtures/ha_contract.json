@@ -394,7 +394,7 @@
     "200": {
       "ok": true,
       "outcome": "woken_push",
-      "words": "Woken — one swipe opens it.",
+      "words": "Woken. One swipe opens it.",
       "at": "2026-10-25T13:30:02+00:00",
       "push": {
         "reached": 1,
@@ -405,14 +405,14 @@
     "409": {
       "ok": false,
       "outcome": "no_tablet",
-      "words": "No tablet gets Logger’s notifications yet — open the Logger app on the tablet once.",
+      "words": "No tablet gets Logger’s notifications yet. Open the Logger app on the tablet once.",
       "at": "2026-10-25T13:30:02+00:00",
       "push": {
         "reached": 0,
         "tablets": 0
       },
       "ssh": null,
-      "error": "No tablet gets Logger’s notifications yet — open the Logger app on the tablet once."
+      "error": "No tablet gets Logger’s notifications yet. Open the Logger app on the tablet once."
     }
   },
   "alerts": {
@@ -420,7 +420,7 @@
       {
         "id": "tasks.queued",
         "severity": "warn",
-        "text": "3 changes waiting for Nextcloud since 10:30 — saving the task: HTTP 502.",
+        "text": "3 task changes not sent yet — waiting for Nextcloud since 10:30 (saving the task: HTTP 502).",
         "where": "Settings → Tasks",
         "href": "/settings?tab=tasks",
         "action": {
@@ -431,7 +431,7 @@
       {
         "id": "tasks.needs_you",
         "severity": "warn",
-        "text": "1 Tasks change meets one made on the server meanwhile — open the task to apply yours again or drop it.",
+        "text": "1 task change clashes with an edit on Nextcloud — open the task to apply yours again or drop it.",
         "where": "Tasks",
         "href": "/tasks"
       }
