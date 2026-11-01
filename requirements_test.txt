@@ -1,4 +1,10 @@
 # Tests run against the minimum HA (2026.2.3 = the user's HA; see CLAUDE.md). One pin per HA
 # release: pytest-homeassistant-custom-component 0.13.316 ships homeassistant==2026.2.3.
 pytest-homeassistant-custom-component==0.13.316
+# Assist's own requirements (the `conversation` integration's; the test package has neither):
+# tests/test_sentences.py matches the voice sentences with hassil, tests/test_voice_assist.py
+# runs them through Home Assistant's agent; both skip without them. Pins = HA 2026.2.3's
+# conversation manifest.
+hassil==3.5.0
+home-assistant-intents==2026.1.28
 ruff==0.17.2

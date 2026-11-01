@@ -37,12 +37,14 @@
         "data": {
           "scan_interval": "Intervalo de leitura",
           "tz": "Fuso horário",
-          "alerts": "Alertas"
+          "alerts": "Alertas",
+          "voice": "Frases de voz"
         },
         "data_description": {
           "scan_interval": "De quanto em quanto tempo o Logger é lido, em segundos (15–600).",
           "tz": "Decide o que é “hoje” nas respostas e escritas do Logger. O do Home Assistant por omissão.",
-          "alerts": "Ler os problemas do Logger para o sensor Problemas."
+          "alerts": "Ler os problemas do Logger para o sensor Problemas.",
+          "voice": "Escreve as frases do Assist a partir das palavras do Logger (comidas, produtos, compras, listas, sintomas) nas frases personalizadas do Home Assistant e na pasta do Speech-to-Phrase, quando existe. Reescritas todos os dias quando mudam; desligar remove-as."
         }
       }
     },
@@ -85,6 +87,9 @@
     "button": {
       "tablet_wake": { "name": "Acordar o tablet" },
       "refresh": { "name": "Atualizar" }
+    },
+    "calendar": {
+      "calendar": { "name": "Calendário" }
     }
   },
   "exceptions": {

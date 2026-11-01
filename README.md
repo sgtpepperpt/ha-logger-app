@@ -3,13 +3,15 @@
 The Home Assistant client of **Logger**, a self-hosted personal health logger (food, glucose,
 medication, symptoms, tasks): its numbers as sensors, its quick entries as buttons, three actions,
 one event — and Logger's hands in Home Assistant: the rules and scenes made in Logger run here
-(*Rules and scenes*), so Home Assistant is never edited by hand. Local polling over the LAN; no
-cloud, no account.
+(*Rules and scenes*), so Home Assistant is never edited by hand; and Logger by voice through Assist
+(*Voice*). Local polling over the LAN; no cloud, no account.
 
 - Domain `logger_app` (Home Assistant's own `logger` integration owns `logger`); display name *Logger*.
 - Needs Home Assistant **2026.2** or newer, HACS, and a Logger answering `GET /api/about` with `api: 1`.
   Rules and scenes need a Logger whose `/about` lists `features: ["rules"]`; with an older one the
-  integration does exactly what it did before (no other call, no webhook, no scene).
+  integration does exactly what it did before (no other call, no webhook, no scene). The calendar
+  entity needs `"calendar"` there; voice (*Voice*: Assist's commands, answers and sentences),
+  `"voice"`.
 
 ## Install
 
@@ -54,6 +56,7 @@ scheduled today, Tasks off, no CGM, a key this Logger doesn't send.
 | button | `quick_<id>` | `GET /quick` | one per quick entry, named and iconed as in Logger; a press fires it |
 | button | `tablet_wake` · `refresh` | | wake the kitchen tablet · read Logger again now (always pressable) |
 | scene | `scene.logger_<name>` | `GET /ha/scenes` | one per Logger scene, named and iconed as there; see *Scenes* |
+| calendar | `calendar` | `calendar` · `GET /calendar/events` | Logger's calendars as one (read-only): on while an event is on (all-day ones all day), its `event` the one under way else the next (`message`, `start_time`, `location`…; attr `today` = how many today); the calendar panel and `calendar.get_events` read Logger's range; *unavailable* while Logger's Calendar is off; only with `features: ["calendar"]` |
 
 - One poll = `GET /status?tz=` every *scan interval* (+ `GET /alerts` with *alerts* on). Logger
   unreachable or a 5xx: every entity *unavailable* until a poll answers again.
@@ -156,12 +159,70 @@ is applied. A scene added in Logger appears with the next cycle that sees the ne
 deleted goes (removed, not left unavailable); a rename keeps the entity id. They work while Logger
 restarts (their states are here); they leave with the integration.
 
+## Voice
+
+Say it to Assist — a voice satellite, the phone, the Assist dialog — and Logger does it: *regista um
+café*, *comprar leite amanhã*, *tomei a B12*, *lembra-me de ligar à mãe amanhã às 9*, *o meu peso é
+62,9*; *quanto tenho livre hoje*, *o que falta*, *qual é a próxima tarefa*. Portuguese (pt-PT) and
+English. Everything stays in the house: Home Assistant hears it, Logger gets the words. Needs a
+Logger whose `/about` lists `"voice"`; Logger's own setup words: Settings → Home Assistant →
+*Setup* → *Voice*.
+
+**The sentences.** Assist only acts on sentences it knows. With **Configure → Voice sentences** on
+(off by default: the file holds Logger's words — foods, products, shopping items, task lists,
+symptoms, Money's items), the integration writes `custom_sentences/pt/logger.yaml` and
+`custom_sentences/en/logger.yaml` into Home Assistant's config folder — and, when `/share` exists
+(Home Assistant OS), the same files into `/share/speech-to-phrase/custom_sentences/`, where the
+Speech-to-Phrase add-on reads them. Built from Logger's `GET /command/vocab` (its 200 usual foods,
+its meals, products, task lists, shops and the shopping list's usual items, symptoms, portion words)
+once Home Assistant has started, every 24 h and on **Refresh**; a file is rewritten only when its
+words changed (Assist is reloaded; Speech-to-Phrase learns them again on its next command). Off
+removes the files; so does removing the integration. A file at that path the integration didn't
+write is never touched (diagnostics: `kept`).
+
+- **Speech-to-Phrase** (fast, under a second on a Pi 4; fixed phrases only): it can say exactly what
+  the file lists — a food by its name, a dose by its product, an item, a number in a range. It
+  can't take free text: a new task's title or a note needs Whisper (or the app). The add-on on
+  Home Assistant OS needs nothing more (it learns changed words within 5 minutes, or on the next
+  command). Speech-to-Phrase in its own container: give it Home Assistant's `custom_sentences`
+  folder once (`--custom-sentences-dir`, mounted read-only) and run it with `--retrain-on-connect`,
+  as the add-on does.
+- **Whisper** (any words; ~8 s on a Pi 4): the same file makes Home Assistant hand the whole sentence
+  to Logger after a command word (*regista*, *comprar*, *lembra-me de*, *nota* …).
+
+| Intent | Sentences (pt · en) | Does |
+| --- | --- | --- |
+| `LoggerCommand` | *regista / comi / bebi / tomei / fiz …* · *log / i ate / i had / took …* | a food, a dose, a reading, a rating, a spend |
+| | *comprar / falta / preciso de comprar …* · *buy / we need …* | the shopping list |
+| | *lembra-me de / tarefa …* · *remind me to / task …* | a task |
+| | *nota …* · *note …* | a diary note |
+| | *sinto / tenho / estou com …* · *i feel / i have …* | a symptom check-in |
+| | *peso / temperatura / febre / tensão …* · *weight / temperature / blood pressure …* | weight, temperature, pressure (*120 por 80*) |
+| | *gastei / paguei …* · *spent / paid …* | Money |
+| `LoggerFreeToday` | *quanto tenho livre hoje* · *how much is free today* | today's free kcal (`/status`) |
+| `LoggerWhatsDue` | *o que falta* · *what's due* | doses and care owed, tasks overdue and today |
+| `LoggerNextTask` | *qual é a próxima tarefa [da lista …]* · *what's my next task [in …]* | the first task due today |
+
+- **One brain**: what is said goes to Logger's command line whole — the same reading as its ⌘K
+  palette. Logger reads it first (`GET /command/parse`, nothing written); only a reading Logger is
+  sure of, of the kind the sentence asked for (a *comprar* sentence is never written as a task), is
+  written: `POST /command/run {text, intent, source: voice}`. Anything less is said back with
+  nothing written: what is missing (*Diz outra vez com a quantidade*), Logger's warning (*already
+  taken*), its guess (*Não tenho a certeza: …?*). What a voice can't say is put back first: the
+  colon of *tarefa:* and *nota:*, *120/80*, a measure's number.
+- **The answer**: English = Logger's own words (*Logged Café 1 chávena*); Portuguese = built from
+  Logger's reading (*Registado: Café 1 chávena.*), for a pt-PT voice (Piper). A write fires
+  `logger_app_fired` `{kind: command, name: <Logger's intent>, words}` and is in Logger's Audit tab
+  as client *ha*, source *voice*.
+- An LLM conversation agent with the Assist API sees the four intents as tools (`LoggerCommand`
+  takes `text` and `family`).
+
 ## Options
 
 Settings → Devices & services → *Logger* → **Configure**: *scan interval* 15–600 s (60), *time zone*
 (Home Assistant's by default — it decides what "today" is in Logger's answers and writes), *alerts*
-on/off (the `problems` sensor). **Reconfigure** = a new address for the same Logger (its
-`instance_id` is checked).
+on/off (the `problems` sensor), *voice sentences* on/off (off; see *Voice*). **Reconfigure** = a new
+address for the same Logger (its `instance_id` is checked).
 
 ## When it goes wrong
 
@@ -178,11 +239,15 @@ on/off (the `problems` sensor). **Reconfigure** = a new address for the same Log
 | Logger: *push failing — polling* | Home Assistant has no internal URL (Settings → System → Network) or Logger refused it: actions still run, a scan interval later |
 | a rule's problem in Logger: *Home Assistant refused the trigger: …* | its device or entity is gone, or its integration was still loading: tried again every 10 cycles, cleared once it registers |
 | a scene activation error *Logger scene — …* | an entity of it refused (the words say which); the rest was applied |
+| Assist: *Sorry, I couldn't understand that* to a Logger sentence | *Voice sentences* is off, Logger has no `voice` yet (update it, then reload the entry), or the phrase isn't in the file (a food Speech-to-Phrase hasn't learnt: Refresh, or wait a day) |
+| Assist answers *Não percebi* / *Not sure …* | Logger read it as something else, or isn't sure: nothing written; say the full name |
+| diagnostics → `voice.kept` | a `logger.yaml` the integration didn't write is in the way: move it, then Refresh |
 
 - *Download diagnostics* (the integration's ⋮): the entry, `/about`, the last `/status`, `/quick`,
   `/alerts`; with rules: the webhook (registered, its URL, Logger's verdict), the last cycle and its
   error, actions run, triggers registered / refused / fired, the revs, scenes, the last catalog and
-  its counts. The webhook id shows only its first 4 characters.
+  its counts. The webhook id shows only its first 4 characters. With voice: the sentences' last
+  build (files written / unchanged / kept, how many names each list holds, an error).
 - Every press and action is in Logger's Audit tab as client *ha* (the integration sends
   `X-Logger-Client: ha`).
 - A copy of Logger restored elsewhere answers with the same `instance_id`: never add a dev copy of

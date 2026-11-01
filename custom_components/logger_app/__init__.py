@@ -5,6 +5,8 @@ read `/status`; buttons and actions write through Logger's own routes, named `ha
 tab. The contract with Logger = tests/fixtures/ha_contract.json + `api` (const.API_MAX).
 A Logger whose `/about.features` has "rules" also gets its hands here (rules.py): the actions
 it queues, its HA-side triggers, its scenes, the catalog of what HA has, a webhook it nudges.
+One whose features have "calendar" gets its calendar entity (calendar.py); "voice", Assist's
+commands and answers and — with the voice option on — the sentences file (voice.py).
 """
 
 from __future__ import annotations
@@ -17,19 +19,27 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .api import LoggerClient, LoggerError
-from .const import API_MAX, CONF_TZ, DOMAIN, FEATURE_RULES
+from .const import API_MAX, CONF_TZ, DOMAIN, FEATURE_RULES, FEATURE_VOICE
 from .coordinator import LoggerConfigEntry, LoggerCoordinator
 from .rules import LoggerRules
 from .services import async_setup_services
+from .voice import VoiceSentences, async_remove_sentences, async_setup_intents
 from .webhook import async_register as async_register_webhook, async_webhook_id
 
-PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SCENE, Platform.SENSOR]
+PLATFORMS = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.CALENDAR,
+    Platform.SCENE,
+    Platform.SENSOR,
+]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_services(hass)
+    async_setup_intents(hass)
     return True
 
 
@@ -64,14 +74,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: LoggerConfigEntry) -> bo
         coordinator.rules = LoggerRules(
             hass, entry, client, about, async_webhook_id(hass, entry)
         )
+    if FEATURE_VOICE in about.features:
+        coordinator.voice = VoiceSentences(hass, entry, coordinator)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     if coordinator.rules is not None:
         async_register_webhook(hass, entry, coordinator.rules)
         coordinator.rules.async_start()
+    if coordinator.voice is not None:
+        coordinator.voice.async_start()
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: LoggerConfigEntry) -> bool:
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: LoggerConfigEntry) -> None:
+    """The entry deleted: the voice sentences it wrote go with it."""
+    await async_remove_sentences(hass, entry.entry_id)

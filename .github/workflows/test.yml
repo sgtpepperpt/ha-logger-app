@@ -46,4 +46,8 @@ jobs:
           cache: pip
           cache-dependency-path: requirements_test.txt
       - run: pip install ${{ matrix.install }}
+      # Assist's own packages (hassil, home-assistant-intents…) for the voice tests: pinned for the
+      # minimum HA in requirements_test.txt; for the newest HA, read from its conversation manifest.
+      - if: matrix.ha == 'latest'
+        run: python -c "import json,pathlib,homeassistant as h;print(' '.join(json.loads((pathlib.Path(h.__file__).parent/'components/conversation/manifest.json').read_text())['requirements']))" | xargs pip install
       - run: pytest

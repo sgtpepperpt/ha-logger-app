@@ -12,6 +12,7 @@ API_MAX: Final = 1
 
 CONF_TZ: Final = "tz"
 CONF_ALERTS: Final = "alerts"
+CONF_VOICE: Final = "voice"
 
 # The LAN port (no sign-in); the public address answers with its sign-in page.
 LAN_EXAMPLE: Final = "http://<host>:4173"
@@ -21,6 +22,9 @@ DEFAULT_SCAN_INTERVAL: Final = 60  # s
 MIN_SCAN_INTERVAL: Final = 15
 MAX_SCAN_INTERVAL: Final = 600
 DEFAULT_ALERTS: Final = True
+# Voice sentences (F69) write Logger's words (foods, products, symptoms…) into Home Assistant's
+# config: only once the user turns them on.
+DEFAULT_VOICE: Final = False
 
 # Logger counts no change kind for quick entries (its data_change kinds: food, body, blood,
 # journal, meds, goals, pressure, workouts, tasks), so `/quick` is read on the first poll and
@@ -43,6 +47,23 @@ SERVICE_TABLET_WAKE: Final = "tablet_wake"
 # Rules + scenes (F39), only with a Logger whose `/about.features` has FEATURE_RULES: the
 # rules and scenes live in Logger (Settings → Home Assistant); this integration is its hands.
 FEATURE_RULES: Final = "rules"
+# The calendar entity (F74), only with a Logger whose `/about.features` has FEATURE_CALENDAR.
+FEATURE_CALENDAR: Final = "calendar"
+# Voice (F69), only with a Logger whose `/about.features` has FEATURE_VOICE: Assist's commands
+# and answers (voice.py) and, with the voice option on, the sentences file (sentences.py) —
+# `<config>/custom_sentences/<pt|en>/logger.yaml` for Home Assistant's agent, and the same file
+# in Speech-to-Phrase's folder under /share when there is one (the add-on's). Rebuilt every
+# VOICE_EVERY_H, at setup and on Refresh; written only when Logger's words changed.
+FEATURE_VOICE: Final = "voice"
+SENTENCES_DIR: Final = "custom_sentences"
+SENTENCES_FILE: Final = "logger.yaml"
+SHARE_DIR: Final = "/share"
+SPEECH_TO_PHRASE_DIR: Final = "/share/speech-to-phrase/custom_sentences"
+VOICE_EVERY_H: Final = 24
+# Logger reads at most 400 days at once (GET /calendar/events): a longer window goes in calls of
+# a year, at most this many.
+CALENDAR_CHUNK_DAYS: Final = 365
+CALENDAR_MAX_CHUNKS: Final = 5
 # An action Logger queued, or a Logger scene, may take this long in Home Assistant (s).
 ACTION_TIMEOUT: Final = 30
 # What HA has (`PUT /ha/catalog`): again after a registry change has been quiet this long (s),

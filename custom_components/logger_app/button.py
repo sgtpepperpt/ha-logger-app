@@ -142,7 +142,8 @@ class LoggerTabletWakeButton(LoggerEntity, ButtonEntity):
 
 
 class LoggerRefreshButton(LoggerEntity, ButtonEntity):
-    """Read Logger again now — `/status` and the quick entries."""
+    """Read Logger again now — `/status`, the quick entries, and its words for the voice
+    sentences when they are on."""
 
     _attr_translation_key = "refresh"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -156,4 +157,6 @@ class LoggerRefreshButton(LoggerEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         self.coordinator.read_quick_next()
+        if (voice := self.coordinator.voice) is not None and voice.on:
+            voice.async_request_sync()
         await self.coordinator.async_refresh()

@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/sgtpepperpt/ha-logger-app/issues",
   "loggers": ["custom_components.logger_app"],
   "requirements": [],
-  "version": "2026.10.2"
+  "version": "2026.11.0"
 }

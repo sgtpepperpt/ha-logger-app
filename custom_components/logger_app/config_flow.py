@@ -2,7 +2,8 @@
 
 `user`: the address → `GET /api/about` → unique_id = instance_id (an address is not an
 identity: the same Logger moved, or restored from a backup, stays one entry). `reconfigure`:
-a new address for the same Logger. Options (reload on save): scan interval, time zone, alerts.
+a new address for the same Logger. Options (reload on save): scan interval, time zone, alerts,
+voice sentences (F69: write Assist's sentences from Logger's words; off by default).
 """
 
 from __future__ import annotations
@@ -41,9 +42,11 @@ from .const import (
     API_MAX,
     CONF_ALERTS,
     CONF_TZ,
+    CONF_VOICE,
     DEFAULT_ALERTS,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_URL,
+    DEFAULT_VOICE,
     DOMAIN,
     LAN_EXAMPLE,
     MAX_SCAN_INTERVAL,
@@ -136,7 +139,8 @@ class LoggerConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class LoggerOptionsFlow(OptionsFlowWithReload):
-    """Scan interval, the time zone that decides Logger's "today", the alerts sensor."""
+    """Scan interval, the time zone that decides Logger's "today", the alerts sensor, the voice
+    sentences."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -174,12 +178,14 @@ class LoggerOptionsFlow(OptionsFlowWithReload):
                     )
                 ),
                 vol.Required(CONF_ALERTS): BooleanSelector(),
+                vol.Required(CONF_VOICE): BooleanSelector(),
             }
         )
         shown = {
             CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
             CONF_TZ: self.hass.config.time_zone,
             CONF_ALERTS: DEFAULT_ALERTS,
+            CONF_VOICE: DEFAULT_VOICE,
             **self.config_entry.options,
             **(user_input or {}),
         }

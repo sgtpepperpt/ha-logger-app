@@ -37,17 +37,19 @@
         "data": {
           "scan_interval": "Scan interval",
           "tz": "Time zone",
-          "alerts": "Alerts"
+          "alerts": "Alerts",
+          "voice": "Voice sentences"
         },
         "data_description": {
           "scan_interval": "How often Logger is read, in seconds (15–600).",
           "tz": "Decides what “today” is in Logger's answers and writes. Home Assistant's own by default.",
-          "alerts": "Read Logger's problems into the Problems sensor."
+          "alerts": "Read Logger's problems into the Problems sensor.",
+          "voice": "Writes Assist's sentences from Logger's words (foods, products, shopping items, lists, symptoms) into Home Assistant's custom sentences, and into Speech-to-Phrase's folder when there is one. Rewritten daily when they change; off removes them."
         }
       }
     },
     "error": {
-      "invalid_tz": "Not a time zone (e.g. Europe/Lisbon)."
+      "invalid_tz": "Not a time zone (e.g. Europe/London)."
     }
   },
   "entity": {
@@ -85,6 +87,9 @@
     "button": {
       "tablet_wake": { "name": "Tablet wake" },
       "refresh": { "name": "Refresh" }
+    },
+    "calendar": {
+      "calendar": { "name": "Calendar" }
     }
   },
   "exceptions": {

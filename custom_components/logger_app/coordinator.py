@@ -35,6 +35,7 @@ from .const import (
 
 if TYPE_CHECKING:
     from .rules import LoggerRules
+    from .voice import VoiceSentences
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -119,6 +120,8 @@ class LoggerCoordinator(DataUpdateCoordinator[LoggerData]):
         self.alerts_on: bool = entry.options.get(CONF_ALERTS, DEFAULT_ALERTS)
         # Rules + scenes (F39): only with a Logger whose `/about.features` has "rules".
         self.rules: LoggerRules | None = None
+        # The voice sentences file (F69): only with a Logger whose features have "voice".
+        self.voice: VoiceSentences | None = None
         self._polls = 0
         self._quick_due = True
 
@@ -186,6 +189,11 @@ class LoggerCoordinator(DataUpdateCoordinator[LoggerData]):
         result = {"outcome": answer.get("outcome"), "words": answer.get("words")}
         self._fired("tablet_wake", None, result["words"])
         return result
+
+    async def async_voice_fired(self, answer: dict[str, Any]) -> None:
+        """A voice command Logger wrote (voice.py): the event, then Logger read again."""
+        self._fired("command", answer.get("intent"), answer.get("words"))
+        await self.async_request_refresh()
 
     async def _ask[T](self, call: Awaitable[T]) -> T:
         """Logger's answer, or an HA error carrying Logger's sentence."""

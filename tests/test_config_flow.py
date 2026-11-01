@@ -8,7 +8,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.logger_app.const import CONF_ALERTS, CONF_TZ, DOMAIN
+from custom_components.logger_app.const import CONF_ALERTS, CONF_TZ, CONF_VOICE, DOMAIN
 from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
 from homeassistant.const import CONF_SCAN_INTERVAL, CONF_URL
 from homeassistant.core import HomeAssistant
@@ -179,14 +179,24 @@ async def test_options_reload(
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {CONF_SCAN_INTERVAL: 30.0, CONF_TZ: "Not/AZone", CONF_ALERTS: False},
+        {
+            CONF_SCAN_INTERVAL: 30.0,
+            CONF_TZ: "Not/AZone",
+            CONF_ALERTS: False,
+            CONF_VOICE: False,
+        },
     )
     assert result["errors"] == {CONF_TZ: "invalid_tz"}
 
     logger_api.mock_calls.clear()
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {CONF_SCAN_INTERVAL: 30.0, CONF_TZ: "Europe/Lisbon", CONF_ALERTS: False},
+        {
+            CONF_SCAN_INTERVAL: 30.0,
+            CONF_TZ: "Europe/Lisbon",
+            CONF_ALERTS: False,
+            CONF_VOICE: False,
+        },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
@@ -194,6 +204,7 @@ async def test_options_reload(
         CONF_SCAN_INTERVAL: 30,
         CONF_TZ: "Europe/Lisbon",
         CONF_ALERTS: False,
+        CONF_VOICE: False,
     }
     assert config_entry.state is ConfigEntryState.LOADED
     coordinator = config_entry.runtime_data

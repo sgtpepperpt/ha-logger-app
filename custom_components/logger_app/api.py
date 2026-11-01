@@ -13,12 +13,14 @@ backend/tests/fixtures/ha_contract.json). Logger's rules for a client:
 
 The `/ha/*` routes (rules + scenes, only when `/about.features` has "rules") are the
 integration's own channel: their bodies are exactly the contract's (`ha_*` keys), no `tz`.
+Voice (F69, `/about.features` has "voice"): `/command/vocab` (the words Assist's sentences are
+built from), `/command/parse` (a reading, nothing written), `/command/run` (`source: voice`).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 import json
 from typing import Any
 
@@ -54,8 +56,8 @@ class LoggerRefused(LoggerError):
 @dataclass(frozen=True, slots=True)
 class About:
     """`GET /api/about`: which Logger this is and which contract it speaks. `features` =
-    what this Logger offers beyond the polled contract ("rules": rules + scenes, F39); an
-    older Logger sends none."""
+    what this Logger offers beyond the polled contract ("rules": rules + scenes, F39;
+    "calendar": the calendar entity, F74); an older Logger sends none."""
 
     api: int
     instance_id: str
@@ -140,6 +142,46 @@ class LoggerClient:
             body["due"] = {"date": due.isoformat(), "time": None}
         body = {k: v for k, v in body.items() if v is not None}
         return _object(await self._call("POST", "/shopping", body=body))
+
+    async def calendar_events(self, start: datetime, end: datetime) -> dict[str, Any]:
+        """Logger's occurrences overlapping [start, end) (F74, `GET /calendar/events`, at most
+        400 days apart): `{instances, events}` — each event once in `events`, by its id."""
+        return _object(
+            await self._call(
+                "GET",
+                "/calendar/events",
+                params={
+                    "from": start.isoformat(),
+                    "to": end.isoformat(),
+                    "tz": self.tz,
+                },
+            )
+        )
+
+    async def command_vocab(self) -> dict[str, Any]:
+        """The words a voice sentence may hold (F69): `{foods, meals, products, lists, shops,
+        usuals, symptoms, units, money: {items, presets, accounts}}`."""
+        return _object(
+            await self._call("GET", "/command/vocab", params={"tz": self.tz})
+        )
+
+    async def command_parse(self, text: str) -> dict[str, Any]:
+        """What Logger reads in `text` — `{intent, confidence, level, eager, head, title, parts,
+        words, needs, warning, alternatives}` — nothing written, no audit line."""
+        return _object(
+            await self._call(
+                "GET", "/command/parse", params={"text": text, "tz": self.tz}
+            )
+        )
+
+    async def command_run(self, text: str, intent: str | None) -> dict[str, Any]:
+        """Do what `text` says, read as `intent` (the reading kept): 201 `{ok, intent, words,
+        ids, path, undo, queued?}`; a refusal (400 with `needs`, a writer's 4xx) carries
+        Logger's sentence in `error`."""
+        body: dict[str, Any] = {"text": text, "source": "voice"}
+        if intent:
+            body["intent"] = intent
+        return _object(await self._call("POST", "/command/run", body=body))
 
     async def tablet_wake(self) -> dict[str, Any]:
         """Wake the kitchen tablet: 200 `{ok, outcome, words}`; 409 not set up, 502 it didn't

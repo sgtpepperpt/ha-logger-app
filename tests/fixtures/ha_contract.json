@@ -1,13 +1,17 @@
 {
-  "doc": "The Home Assistant integration's contract with Logger (logger_app, github.com/sgtpepperpt/ha-logger-app; docs/home-assistant.md): one example answer of every route it reads — GET /about, GET /status?tz=, GET /quick (one entry of each kind), POST /quick/<id>/fire (201, and a med tick's 409 with `already`), POST /shopping (201, and 202 = queued while Nextcloud is down), POST /tablet/wake (200, and 409 = not set up), GET /alerts — keyed by HTTP status where a route has two. Rules + scenes (F39, `about.features` has \"rules\"): `ha_catalog.request` = the body the integration PUTs to /ha/catalog (Logger checks it is accepted), `ha_actions` = GET /ha/actions (the integration's every poll: waiting actions to run + the revs it refetches /ha/rules?kind=from_ha and /ha/scenes on), `ha_action_result` = POST /ha/actions/<id>/result, `ha_rules` = GET /ha/rules?kind=from_ha (HA-side triggers to register; a `device` one carries the trigger config as HA listed it), `ha_rule_fire` = POST /ha/rules/<id>/fire (an HA trigger happened: Logger runs the rule's Logger-side actions itself), `ha_rule_state` = POST /ha/rules/<id>/state (registration outcome), `ha_scenes` = GET /ha/scenes, `ha_webhook` = the body Logger POSTs to the integration's webhook (a nudge, never data). backend/tests/test_ha_contract.py checks every key path here against what the server answers, with the same JSON type (null = the key is nullable); the integration's tests parse a copy. A key the server adds never breaks the integration and never bumps `about.api`; a key it reads renamed, removed or retyped does both. `status.food` = status_parity.json's first case (25 Oct 13:30Z, Lisbon). `status.changes` is keyed by data: one key per kind written so far (food, body, blood, journal, meds, goals, pressure, workouts, tasks). Null means unknown, never 0: no calorie goal, no medication today, Tasks off. Instants are ISO 8601 with an offset; the caller's `tz` decides every day.",
+  "doc": "The Home Assistant integration's contract with Logger (logger_app, github.com/sgtpepperpt/ha-logger-app; docs/home-assistant.md): one example answer of every route it reads — GET /about, GET /status?tz=, GET /quick (one entry of each kind), POST /quick/<id>/fire (201, and a med tick's 409 with `already`), POST /shopping (201, and 202 = queued while Nextcloud is down), POST /tablet/wake (200, and 409 = not set up), GET /alerts — keyed by HTTP status where a route has two. Rules + scenes (F39, `about.features` has \"rules\"): `ha_catalog.request` = the body the integration PUTs to /ha/catalog (Logger checks it is accepted), `ha_actions` = GET /ha/actions (the integration's every poll: waiting actions to run + the revs it refetches /ha/rules?kind=from_ha and /ha/scenes on), `ha_action_result` = POST /ha/actions/<id>/result, `ha_rules` = GET /ha/rules?kind=from_ha (HA-side triggers to register; a `device` one carries the trigger config as HA listed it), `ha_rule_fire` = POST /ha/rules/<id>/fire (an HA trigger happened: Logger runs the rule's Logger-side actions itself), `ha_rule_state` = POST /ha/rules/<id>/state (registration outcome), `ha_scenes` = GET /ha/scenes, `ha_webhook` = the body Logger POSTs to the integration's webhook (a nudge, never data). backend/tests/test_ha_contract.py checks every key path here against what the server answers, with the same JSON type (null = the key is nullable); the integration's tests parse a copy. A key the server adds never breaks the integration and never bumps `about.api`; a key it reads renamed, removed or retyped does both. `status.food` = status_parity.json's first case (25 Oct 13:30Z, Lisbon). `status.changes` is keyed by data: one key per kind written so far (food, body, blood, journal, meds, goals, pressure, workouts, tasks). Null means unknown, never 0: no calorie goal, no medication today, Tasks off. A Daily care slot an entry ticked (F67: a reading, a body entry, a workout… the item is done by) is answered and leaves `care`; one whose item asks to review it stays owed and carries `evidence` {kind, at, words, what, id}, the entry it offers as its tick (null on every other slot). Calendar (F74, `about.features` has \"calendar\"): `status.calendar` = the next event and today’s (status_parity.json’s calendar case at 5 Nov 14:00, Lisbon: `next` the first still to start — a timed one up to 10 min after its start, an all-day one from its first day after today — with `in_min`; `rows` today’s occurrences, all-day first, ended ones too; `today_n` all of today’s; null while Calendar is off), `calendar_events` = GET /calendar/events?from&to&tz (the occurrences overlapping [from, to) in `instances`, each event once in `events`, keyed by its id; an all-day occurrence’s days in `start_date` … `end_date`, exclusive). Instants are ISO 8601 with an offset; the caller's `tz` decides every day. Every id and address is made up: the instance a v4 UUID of zeros, the HA device id a counting pattern, the trigger id a made-up one (the integration's own are `trigger_id()` of the config), the webhook on a documentation address (192.0.2.0/24). `about.version` = the release (the repo's VERSION, SemVer), added with F70: null from a server that can't say. Voice (F69, `about.features` has \"voice\"): `command_vocab` = GET /command/vocab?tz (the words the integration builds Assist’s sentences from; `units` = the portion types those foods are said in), `command_parse` = GET /command/parse?text&tz (a reading, nothing written: `eager` = sure enough to write, else `needs` or `warning` say why not; `alternatives` the other readings: the integration keeps the first of the kind its sentence asked for), `command_run` = POST /command/run (`request` = the body the integration sends, `source: voice`; 201, and 400 with `needs`), `voice.sentences` = what speech-to-text gives (`said`, `lang`), the sentence family the integration’s sentences match it to, the line it sends (`text`) and the intent Logger reads it as, eagerly: the integration checks its sentences over `command_vocab`, Logger its grammar over test_command’s world (tests/test_ha_voice.py).",
+  "errors": "A refusal is always JSON with `error` = the words to show; a route's own may add keys (`ok`, `already`, `field`); the server's own are exactly {\"error\": <words>, \"status\": <code>}: an unknown route 404 \"Nothing at that address.\", a wrong method 405, a body that is no JSON 400 (not sent as JSON 415), a server fault 500 \"Something broke on the server · ref <id>\". An answer that is not JSON is a proxy's, never Logger's.",
   "about": {
     "name": "Logger",
     "api": 1,
-    "instance_id": "7c1e5f0a-3b9d-4e2a-9f61-0d4b8a2c6e35",
+    "instance_id": "00000000-0000-4000-8000-000000000001",
     "code": "3f2a9c1d7e4b",
     "features": [
-      "rules"
-    ]
+      "rules",
+      "calendar",
+      "voice"
+    ],
+    "version": "0.1.0"
   },
   "status": {
     "as_of": "2026-10-25T13:30:00.418204+00:00",
@@ -160,6 +164,13 @@
           "dose": 1.0,
           "amount": null,
           "form": "check",
+          "evidence": {
+            "kind": "workout",
+            "at": "2026-10-25T12:40:00+00:00",
+            "words": "Push A · 12:40",
+            "what": "Push A",
+            "id": 7101
+          },
           "state": "due"
         }
       ],
@@ -182,6 +193,7 @@
         "dose": 1.0,
         "amount": null,
         "form": "check",
+        "evidence": null,
         "state": "next"
       },
       "later": 1,
@@ -230,6 +242,96 @@
           "words": "today",
           "kind": "task",
           "overdue": false
+        }
+      ]
+    },
+    "calendar": {
+      "next": {
+        "id": 206,
+        "occurrence": null,
+        "summary": "Dentist",
+        "start": "2026-11-05T16:00:00+00:00",
+        "end": "2026-11-05T17:00:00+00:00",
+        "all_day": false,
+        "date": "2026-11-05",
+        "last_date": null,
+        "where": "Clinic, Rua Nova 1",
+        "calendar": "Personal",
+        "color": "#3b82f6",
+        "path": "/calendar?event=206",
+        "in_min": 120
+      },
+      "today_n": 5,
+      "rows": [
+        {
+          "id": 208,
+          "occurrence": null,
+          "summary": "Conference",
+          "start": "2026-11-04T00:00:00+00:00",
+          "end": "2026-11-07T00:00:00+00:00",
+          "all_day": true,
+          "date": "2026-11-04",
+          "last_date": "2026-11-06",
+          "where": "Expo hall",
+          "calendar": "Work",
+          "color": "#c98879",
+          "path": "/calendar?event=208"
+        },
+        {
+          "id": 201,
+          "occurrence": null,
+          "summary": "Holiday",
+          "start": "2026-11-05T00:00:00+00:00",
+          "end": "2026-11-06T00:00:00+00:00",
+          "all_day": true,
+          "date": "2026-11-05",
+          "last_date": "2026-11-05",
+          "where": null,
+          "calendar": "Personal",
+          "color": "#3b82f6",
+          "path": "/calendar?event=201"
+        },
+        {
+          "id": 202,
+          "occurrence": "2026-11-05T09:00:00Z",
+          "summary": "Standup",
+          "start": "2026-11-05T09:00:00+00:00",
+          "end": "2026-11-05T09:15:00+00:00",
+          "all_day": false,
+          "date": "2026-11-05",
+          "last_date": null,
+          "where": null,
+          "calendar": "Work",
+          "color": "#c98879",
+          "path": "/calendar?event=202&occurrence=2026-11-05T09:00:00Z"
+        },
+        {
+          "id": 203,
+          "occurrence": null,
+          "summary": "Lunch with Sam",
+          "start": "2026-11-05T13:30:00+00:00",
+          "end": "2026-11-05T14:30:00+00:00",
+          "all_day": false,
+          "date": "2026-11-05",
+          "last_date": null,
+          "where": "Café Central",
+          "calendar": "Personal",
+          "color": "#3b82f6",
+          "path": "/calendar?event=203"
+        },
+        {
+          "id": 206,
+          "occurrence": null,
+          "summary": "Dentist",
+          "start": "2026-11-05T16:00:00+00:00",
+          "end": "2026-11-05T17:00:00+00:00",
+          "all_day": false,
+          "date": "2026-11-05",
+          "last_date": null,
+          "where": "Clinic, Rua Nova 1",
+          "calendar": "Personal",
+          "color": "#3b82f6",
+          "path": "/calendar?event=206"
         }
       ]
     },
@@ -437,11 +539,94 @@
       }
     ]
   },
+  "calendar_events": {
+    "from": "2026-11-05T00:00:00+00:00",
+    "to": "2026-11-06T00:00:00+00:00",
+    "tz": "Europe/Lisbon",
+    "connected": true,
+    "enabled": true,
+    "instances": [
+      {
+        "event_id": 106,
+        "collection_id": 101,
+        "recurrence_id": null,
+        "start": "2026-11-05T00:00:00+00:00",
+        "end": "2026-11-06T00:00:00+00:00",
+        "all_day": true,
+        "start_date": "2026-11-05",
+        "end_date": "2026-11-06",
+        "last_date": "2026-11-05",
+        "summary": "Holiday",
+        "location": null,
+        "status": null,
+        "recurring": false
+      },
+      {
+        "event_id": 108,
+        "collection_id": 102,
+        "recurrence_id": "2026-11-05T09:00:00Z",
+        "start": "2026-11-05T09:00:00+00:00",
+        "end": "2026-11-05T09:15:00+00:00",
+        "all_day": false,
+        "start_date": null,
+        "end_date": null,
+        "last_date": null,
+        "summary": "Standup",
+        "location": null,
+        "status": null,
+        "recurring": true
+      },
+      {
+        "event_id": 104,
+        "collection_id": 101,
+        "recurrence_id": null,
+        "start": "2026-11-05T16:00:00+00:00",
+        "end": "2026-11-05T17:00:00+00:00",
+        "all_day": false,
+        "start_date": null,
+        "end_date": null,
+        "last_date": null,
+        "summary": "Dentist",
+        "location": "Clinic, Rua Nova 1",
+        "status": null,
+        "recurring": false
+      }
+    ],
+    "events": {
+      "104": {
+        "id": 104,
+        "uid": "dentist-1",
+        "summary": "Dentist",
+        "description": "Bring the referral",
+        "location": "Clinic, Rua Nova 1",
+        "all_day": false,
+        "recurring": false
+      },
+      "106": {
+        "id": 106,
+        "uid": "holiday-1",
+        "summary": "Holiday",
+        "description": null,
+        "location": null,
+        "all_day": true,
+        "recurring": false
+      },
+      "108": {
+        "id": 108,
+        "uid": "standup-1",
+        "summary": "Standup",
+        "description": null,
+        "location": null,
+        "all_day": false,
+        "recurring": true
+      }
+    }
+  },
   "ha_catalog": {
     "request": {
       "ha": {
         "version": "2026.2.3",
-        "webhook": "http://192.168.1.20:8123/api/webhook/logger_app_5c0d2e7f4a1b"
+        "webhook": "http://192.0.2.20:8123/api/webhook/logger_app_0123456789ab"
       },
       "scenes": [
         {
@@ -538,7 +723,7 @@
           "trigger": {
             "trigger": "device",
             "domain": "zha",
-            "device_id": "c5a1e0b2d3f4a5b6c7d8e9f0a1b2c3d4",
+            "device_id": "0123456789abcdef0123456789abcdef",
             "type": "remote_button_short_press",
             "subtype": "button_1"
           }
@@ -705,7 +890,7 @@
             "trigger": {
               "trigger": "device",
               "domain": "zha",
-              "device_id": "c5a1e0b2d3f4a5b6c7d8e9f0a1b2c3d4",
+              "device_id": "0123456789abcdef0123456789abcdef",
               "type": "remote_button_short_press",
               "subtype": "button_1"
             }
@@ -845,7 +1030,456 @@
     }
   },
   "ha_webhook": {
-    "logger": "7c1e5f0a-3b9d-4e2a-9f61-0d4b8a2c6e35",
+    "logger": "00000000-0000-4000-8000-000000000001",
     "reason": "actions"
+  },
+  "command_vocab": {
+    "foods": [
+      "Café",
+      "Pão de forma",
+      "Banana",
+      "Ovo",
+      "Leite meio-gordo",
+      "Castanha de caju",
+      "Chá verde",
+      "Leite de soja",
+      "Bolo de laranja"
+    ],
+    "lists": [
+      "inbox",
+      "errands",
+      "home <-> office",
+      "Garden",
+      "garage",
+      "projects"
+    ],
+    "meals": [
+      "Pequeno almoço"
+    ],
+    "money": {
+      "accounts": [
+        "alpha",
+        "cash",
+        "current",
+        "wallet"
+      ],
+      "items": [
+        "Café"
+      ],
+      "presets": [
+        "Renda"
+      ]
+    },
+    "products": [
+      "B12",
+      "cobalamina",
+      "Melatonina",
+      "Lentes",
+      "contact lenses",
+      "Leite de magnésia",
+      "Morning box",
+      "caixa da manhã"
+    ],
+    "shops": [
+      "Mercado Central",
+      "Loja do bairro"
+    ],
+    "symptoms": [
+      "Dor de cabeça",
+      "headache",
+      "Tosse",
+      "cough",
+      "Nausea"
+    ],
+    "units": [
+      "chávena",
+      "caneca",
+      "copo",
+      "fatia",
+      "un"
+    ],
+    "usuals": [
+      "Leite",
+      "Pão",
+      "Detergente"
+    ]
+  },
+  "command_parse": {
+    "eager": {
+      "alternatives": [
+        {
+          "confidence": 0.35,
+          "eager": false,
+          "head": "Add task",
+          "intent": "task",
+          "label": "Task",
+          "level": "low",
+          "needs": [],
+          "parts": [
+            "inbox"
+          ],
+          "title": "regista uma chávena de café",
+          "warning": null,
+          "words": "Add task · regista uma chávena de café · inbox"
+        }
+      ],
+      "confidence": 0.95,
+      "eager": true,
+      "fields": {
+        "at": null,
+        "count": 1.0,
+        "date_only": false,
+        "grams": 150.0,
+        "key": "card:1",
+        "kind": "food",
+        "name": "Café",
+        "planned": false,
+        "prec": "exact",
+        "unit": "chávena",
+        "verbatim": null
+      },
+      "head": "Log",
+      "intent": "food",
+      "intents": [
+        {
+          "intent": "food",
+          "label": "Food"
+        },
+        {
+          "intent": "shopping",
+          "label": "Shopping"
+        },
+        {
+          "intent": "diary",
+          "label": "Diary"
+        },
+        {
+          "intent": "task",
+          "label": "Task"
+        }
+      ],
+      "label": "Food",
+      "level": "high",
+      "needs": [],
+      "parts": [
+        "now"
+      ],
+      "text": "regista uma chávena de café",
+      "title": "Café 1 chávena",
+      "warning": null,
+      "words": "Log · Café 1 chávena · now"
+    },
+    "needs": {
+      "alternatives": [
+        {
+          "confidence": 0.35,
+          "eager": false,
+          "head": "Add task",
+          "intent": "task",
+          "label": "Task",
+          "level": "low",
+          "needs": [],
+          "parts": [
+            "inbox"
+          ],
+          "title": "comi 3 bananas",
+          "warning": null,
+          "words": "Add task · comi 3 bananas · inbox"
+        }
+      ],
+      "confidence": 0.9,
+      "eager": false,
+      "fields": {
+        "at": null,
+        "date_only": false,
+        "key": "card:4",
+        "kind": "food",
+        "name": "Banana",
+        "planned": false
+      },
+      "head": "Log",
+      "intent": "food",
+      "intents": [
+        {
+          "intent": "food",
+          "label": "Food"
+        },
+        {
+          "intent": "shopping",
+          "label": "Shopping"
+        },
+        {
+          "intent": "diary",
+          "label": "Diary"
+        },
+        {
+          "intent": "task",
+          "label": "Task"
+        }
+      ],
+      "label": "Food",
+      "level": "high",
+      "needs": [
+        {
+          "kind": "text",
+          "label": "Amount",
+          "name": "amount"
+        }
+      ],
+      "parts": [
+        "now"
+      ],
+      "text": "comi 3 bananas",
+      "title": "Banana",
+      "warning": null,
+      "words": "Log · Banana · now"
+    },
+    "warning": {
+      "alternatives": [
+        {
+          "confidence": 0.35,
+          "eager": false,
+          "head": "Add task",
+          "intent": "task",
+          "label": "Task",
+          "level": "low",
+          "needs": [],
+          "parts": [
+            "inbox"
+          ],
+          "title": "tomei leite de magnésia",
+          "warning": null,
+          "words": "Add task · tomei leite de magnésia · inbox"
+        }
+      ],
+      "confidence": 0.95,
+      "eager": false,
+      "fields": {
+        "at": null,
+        "check": false,
+        "kind": "product",
+        "name": "Leite de magnésia",
+        "p": 13,
+        "slot": {
+          "as_needed": false,
+          "owed": false,
+          "why": "Leite de magnésia: already taken, next at 20:00"
+        }
+      },
+      "head": "Took",
+      "intent": "meds",
+      "intents": [
+        {
+          "intent": "meds",
+          "label": "Meds"
+        },
+        {
+          "intent": "shopping",
+          "label": "Shopping"
+        },
+        {
+          "intent": "diary",
+          "label": "Diary"
+        },
+        {
+          "intent": "task",
+          "label": "Task"
+        }
+      ],
+      "label": "Meds",
+      "level": "high",
+      "needs": [],
+      "parts": [],
+      "text": "tomei leite de magnésia",
+      "title": "Leite de magnésia",
+      "warning": "Leite de magnésia: already taken, next at 20:00",
+      "words": "Took · Leite de magnésia"
+    }
+  },
+  "command_run": {
+    "request": {
+      "text": "regista uma chávena de café",
+      "intent": "food",
+      "source": "voice",
+      "tz": "Europe/Lisbon"
+    },
+    "201": {
+      "ids": [
+        812
+      ],
+      "intent": "food",
+      "ok": true,
+      "path": "/food",
+      "undo": [
+        {
+          "method": "DELETE",
+          "path": "/measurements/812"
+        }
+      ],
+      "words": "Logged Café 1 chávena"
+    },
+    "400": {
+      "error": "Symptom needs: level.",
+      "intent": "symptom",
+      "needs": [
+        {
+          "kind": "number",
+          "label": "Level",
+          "name": "level"
+        }
+      ],
+      "ok": false
+    }
+  },
+  "voice": {
+    "sentences": [
+      {
+        "lang": "pt",
+        "said": "regista uma chávena de café",
+        "family": "log",
+        "text": "regista uma chávena de café",
+        "intent": "food"
+      },
+      {
+        "lang": "pt",
+        "said": "comi dois ovos ontem às 9 horas",
+        "family": "log",
+        "text": "comi dois ovos ontem às 9 horas",
+        "intent": "food"
+      },
+      {
+        "lang": "pt",
+        "said": "tomei a b12",
+        "family": "log",
+        "text": "tomei a b12",
+        "intent": "meds"
+      },
+      {
+        "lang": "pt",
+        "said": "comprar leite amanhã",
+        "family": "buy",
+        "text": "comprar leite amanhã",
+        "intent": "shopping"
+      },
+      {
+        "lang": "pt",
+        "said": "lembra-me de ligar à mãe amanhã às 9",
+        "family": "remind",
+        "text": "lembra-me de ligar à mãe amanhã às 9",
+        "intent": "task"
+      },
+      {
+        "lang": "pt",
+        "said": "tarefa marcar dentista",
+        "family": "remind",
+        "text": "tarefa: marcar dentista",
+        "intent": "task"
+      },
+      {
+        "lang": "pt",
+        "said": "nota dormi mal",
+        "family": "note",
+        "text": "nota: dormi mal",
+        "intent": "diary"
+      },
+      {
+        "lang": "pt",
+        "said": "sinto dor de cabeça forte",
+        "family": "feel",
+        "text": "sinto dor de cabeça forte",
+        "intent": "symptom"
+      },
+      {
+        "lang": "pt",
+        "said": "o meu peso é 62,9",
+        "family": "measure",
+        "text": "peso 62.9",
+        "intent": "body"
+      },
+      {
+        "lang": "pt",
+        "said": "febre 38,2",
+        "family": "measure",
+        "text": "temperatura 38.2",
+        "intent": "temperature"
+      },
+      {
+        "lang": "pt",
+        "said": "a minha tensão é 120 por 80 e pulso 65",
+        "family": "measure",
+        "text": "tensão 120/80 pulso 65",
+        "intent": "pressure"
+      },
+      {
+        "lang": "pt",
+        "said": "gastei 1 euro e 20 cêntimos no café",
+        "family": "spend",
+        "text": "gastei 1,20 € em Café",
+        "intent": "money"
+      },
+      {
+        "lang": "en",
+        "said": "i had a cup of café",
+        "family": "log",
+        "text": "i had a cup of café",
+        "intent": "food"
+      },
+      {
+        "lang": "en",
+        "said": "took b12",
+        "family": "log",
+        "text": "took b12",
+        "intent": "meds"
+      },
+      {
+        "lang": "en",
+        "said": "buy batteries tomorrow",
+        "family": "buy",
+        "text": "buy batteries tomorrow",
+        "intent": "shopping"
+      },
+      {
+        "lang": "en",
+        "said": "remind me to call mom tomorrow",
+        "family": "remind",
+        "text": "remind me to call mom tomorrow",
+        "intent": "task"
+      },
+      {
+        "lang": "en",
+        "said": "note slept badly",
+        "family": "note",
+        "text": "note: slept badly",
+        "intent": "diary"
+      },
+      {
+        "lang": "en",
+        "said": "i feel a headache level 2",
+        "family": "feel",
+        "text": "i feel a headache level 2",
+        "intent": "symptom"
+      },
+      {
+        "lang": "en",
+        "said": "my weight is 62.9",
+        "family": "measure",
+        "text": "weight 62.9",
+        "intent": "body"
+      },
+      {
+        "lang": "en",
+        "said": "my blood pressure is 120 over 80 and pulse 65",
+        "family": "measure",
+        "text": "blood pressure 120/80 pulse 65",
+        "intent": "pressure"
+      },
+      {
+        "lang": "en",
+        "said": "spent 3 euros on café",
+        "family": "spend",
+        "text": "spent 3,00 € on Café",
+        "intent": "money"
+      }
+    ]
   }
 }

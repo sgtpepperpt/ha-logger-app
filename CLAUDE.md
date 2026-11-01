@@ -8,7 +8,7 @@ Logger's contract (`GET /about` `api`, `backend/tests/fixtures/ha_contract.json`
 change that touches the contract updates this repo in the same piece of work, copies the fixture
 here and bumps `manifest.json` `version`. A `ship` / `ship both` in a Logger session ships this repo
 too when it has pending work. Spec: Logger's
-`docs/feature-plan-2026-10-pass3.md` → *F30*, `-pass4.md` → *F39* (rules + scenes). User doc: Logger's `docs/home-assistant.md` (mirrors
+`docs/feature-plan-2026-10-pass3.md` → *F30*, `-pass4.md` → *F39* (rules + scenes), `-pass6.md` → *F69* (voice), *F74* (calendar entity). User docs: Logger's `docs/home-assistant.md` + `docs/voice.md` (mirror
 this README's tables — keep them consistent; when they must differ, tell the user what to change
 there).
 
@@ -37,6 +37,7 @@ Run command (no server of its own: it runs inside Home Assistant; on the Mac = i
   2026.10.x on 2026-10-27) rejects the key; add `"categories": ["health_wellbeing"]` once that
   image is ≥ 2026.11 (the HACS action only warns while it is missing).
 - No HACS default-list submission, no brands-repo PR.
+- Voice (F69): the integration writes Assist's sentence files itself (`custom_sentences/<pt|en>/logger.yaml`, + Speech-to-Phrase's folder when `/share` exists), only while the entry's *Voice sentences* option is on (off by default), and never touches a file without its marker (`sentences.MARKER`); the option off or the entry removed takes them away.
 - `dependencies: ["webhook"]` only; no `after_dependencies` (hassfest allows `device_automation`,
   `zone`, `person`, `script`, `automation` and every platform).
 
@@ -46,9 +47,14 @@ Run command (no server of its own: it runs inside Home Assistant; on the Mac = i
   `backend/tests/fixtures/ha_contract.json`. Never edit it here. Logger changed it → copy it over
   (`cp …/logger/backend/tests/fixtures/ha_contract.json tests/fixtures/`), run the tests, adapt,
   release.
-- `GET /api/about` → `{name, api, instance_id, code, features}`; `features` (optional, never an `api`
-  bump): `"rules"` = the `/ha/*` routes. Read at setup only. Without it: no `/ha/*` call, no
-  webhook, no scene.
+- `GET /api/about` → `{name, api, instance_id, code, features, version}` (`version` = Logger's
+  release, shown only); `features` (optional, never an `api` bump): `"rules"` = the `/ha/*` routes,
+  `"calendar"` = `calendar.logger_calendar` (+ `GET /calendar/events`), `"voice"` = Assist through
+  `/command/vocab|parse|run`. Read at setup only. Without one: none of its calls (no `/ha/*`, no
+  webhook, no scene; no calendar entity; no voice intents).
+- The fixture also pins `errors` (every refusal = `{error, status}`), `calendar_events`,
+  `command_vocab|parse|run` and `voice.sentences` (samples the sentences must match AND Logger's
+  grammar must read — checked on both sides).
 - `/ha/*` bodies = the fixture's `ha_*` request shapes exactly, no `tz`. A result's 404/409 = fine.
   A fire is retried with the same `event` after 30/90/180 s on no answer or a 5xx; a 404 refetches
   the rules. `/state` only when the outcome differs from `problem`. A device trigger's `id` =
@@ -81,7 +87,11 @@ description tables · `button.py` dynamic quick buttons (registry cleanup) · `s
 entry background task, never fails the poll) · `actions.py` runs a `do` or scene states ·
 `triggers.py` `when` → HA trigger · `catalog.py` the PUT body + webhook URL · `webhook.py` the nudge
 (`entry.data["webhook_id"]`) · `scene.py` dynamic Logger scenes, registry cleanup as `button.py` ·
-`translations/en.json` = the source (no `strings.json` in custom
+`calendar.py` the calendar entity (state from `/status.calendar`, the panel from `GET /calendar/events`,
+≤ `CALENDAR_CHUNK_DAYS` a call; read-only) · `voice.py` Assist's intents (`LoggerCommand` → parse, only an
+*eager* reading runs; answers from `/status`) + the sentence files · `sentences.py` PURE the custom
+sentences from `/command/vocab` (families, digest first line) · `speech.py` PURE what Assist says (pt-PT
+built here, English = Logger's `words`) · `translations/en.json` = the source (no `strings.json` in custom
 integrations); `pt.json` mirrors it (pt-PT).
 
 - English entity names slug to their keys (entity ids `sensor.logger_<key>`) — keep it so.
@@ -101,12 +111,15 @@ integrations); `pt.json` mirrors it (pt-PT).
 ## Verify
 
 - `.venv/bin/pytest` and `.venv-latest/bin/pytest`; `.venv/bin/ruff check . && .venv/bin/ruff format --check .`
+- Assist's packages (hassil, home-assistant-intents) are pinned in `requirements_test.txt` to the minimum
+  HA's conversation manifest; `.venv-latest` needs the newest HA's (CI installs them from its
+  conversation manifest); the voice tests skip without them.
 - hassfest + HACS action run in CI only (`validate.yml`); the HACS action also checks the GitHub
   repo's description, topics and issues.
 - `conftest.mock_ha` answers `/ha/*` from the fixture with an empty queue and without the zha
   device rule (HA would try to import zha); pass `rules=` to include it.
 - Live shapes: the Logger dev stack at `http://localhost:5173/api` — **GET only**
-  (`/about`, `/status?tz=…`, `/quick`, `/alerts`). Its database is a copy of production: never
+  (`/about`, `/status?tz=…`, `/quick`, `/alerts`, `/calendar/events`, `/command/vocab`, `GET /command/parse`). Its database is a copy of production: never
   POST/PUT/DELETE there, never add it to the user's HA (same `instance_id` as prod).
 
 ## Release (HACS offers releases only — `hide_default_branch: true`)

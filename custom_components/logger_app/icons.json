@@ -51,6 +51,9 @@
     "button": {
       "tablet_wake": { "default": "mdi:tablet" },
       "refresh": { "default": "mdi:refresh" }
+    },
+    "calendar": {
+      "calendar": { "default": "mdi:calendar" }
     }
   },
   "services": {

@@ -1,5 +1,6 @@
 """*Download diagnostics*: the entry, Logger's `/about`, the last `/status`, `/quick`, `/alerts`,
-and — with the rules feature on — the state of the rules, scenes, catalog and webhook.
+and — with the rules feature on — the state of the rules, scenes, catalog and webhook; with the
+voice feature, the sentences file's last build (where written, the lists' sizes, an error).
 
 Nothing else redacted: the address is a LAN one (no credentials exist — Logger's LAN port has
 no sign-in) and the data is the user's own, downloaded by them. The webhook id is the one
@@ -14,7 +15,7 @@ from typing import Any
 from homeassistant.const import CONF_WEBHOOK_ID
 from homeassistant.core import HomeAssistant
 
-from .const import FEATURE_RULES
+from .const import FEATURE_RULES, FEATURE_VOICE
 from .coordinator import LoggerConfigEntry
 from .rules import mask
 
@@ -45,5 +46,11 @@ async def async_get_config_entry_diagnostics(
         "rules": {
             "feature": FEATURE_RULES in coordinator.about.features,
             **(rules.diagnostics() if rules is not None else {}),
+        },
+        "voice": {
+            "feature": FEATURE_VOICE in coordinator.about.features,
+            **(
+                coordinator.voice.diagnostics() if coordinator.voice is not None else {}
+            ),
         },
     }
