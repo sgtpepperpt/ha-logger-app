@@ -128,6 +128,32 @@ def test_every_sample_is_its_family_and_its_line(sample: dict[str, Any]) -> None
 
 
 @pytest.mark.parametrize(
+    ("said", "lang", "sent"),
+    [
+        ("contei 30 euros", "pt", "contei 30,00 €"),
+        ("contei o dinheiro 12 euros e 50 cêntimos", "pt", "contei 12,50 €"),
+        ("dinheiro contado 0", "pt", "contei 0,00 €"),
+        ("contei 1250,40 euros", "pt", "contei 1250,40 euros"),
+        ("contei", "pt", "contei"),
+        ("contei uma história", "pt", "contei uma história"),
+        ("i counted 30 euros", "en", "counted cash 30,00 €"),
+        ("count cash 7", "en", "counted cash 7,00 €"),
+        ("i counted 30.50 euros", "en", "counted cash 30.50 euros"),
+        ("counted cash", "en", "counted cash"),
+        ("i counted the steps", "en", "i counted the steps"),
+    ],
+)
+def test_the_cash_counted_is_a_spend_led_as_logger_reads_it(
+    said: str, lang: str, sent: str
+) -> None:
+    result = best(said, lang)
+    assert result is not None
+    slots = {name: entity.value for name, entity in result.entities.items()}
+    assert slots.pop("family") == "spend"
+    assert command_text("spend", said, slots, lang) == sent
+
+
+@pytest.mark.parametrize(
     ("text", "lang", "intent", "slots"),
     [
         ("quanto tenho livre hoje", "pt", "LoggerFreeToday", {}),

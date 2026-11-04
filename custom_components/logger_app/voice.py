@@ -70,6 +70,37 @@ _MARKERS = {
 _OVER = re.compile(
     r"\b(\d{2,3})\s+(?:por|sobre|over|by|barra|slash)\s+(\d{2,3})\b", re.IGNORECASE
 )
+_COUNTED = {
+    speech.PT: re.compile(
+        r"(?:contei o dinheiro|contei dinheiro|dinheiro contado|contei)\b",
+        re.IGNORECASE,
+    ),
+    speech.EN: re.compile(
+        r"(?:i counted cash|i counted|counted cash|count cash|cash counted|cash count)\b",
+        re.IGNORECASE,
+    ),
+}
+COUNT_LEAD = {speech.PT: "contei", speech.EN: "counted cash"}
+_AMOUNT_ONLY = re.compile(r"(?:(?:€\s*)?\d[\d.,]*\s*(?:€|eur|euros?)?)?", re.IGNORECASE)
+
+
+def _euros(euros: Any, cents: Any) -> str:
+    return f"{int(euros)},{int(cents or 0):02d} €"
+
+
+def _counted(text: str, slots: dict[str, Any], lang: str) -> str | None:
+    verb = _COUNTED[lang].match(text)
+    if verb is None:
+        return None
+    euros = slots.get("logger_euros")
+    rest = (
+        _euros(euros, slots.get("logger_cents"))
+        if euros is not None
+        else text[verb.end() :].strip()
+    )
+    if not _AMOUNT_ONLY.fullmatch(rest):
+        return None
+    return f"{COUNT_LEAD[lang]} {rest}".strip()
 
 
 def voice_logger(hass: HomeAssistant) -> tuple[LoggerCoordinator | None, str | None]:
@@ -108,9 +139,11 @@ def command_text(
             text = f"{measure} {rest}"
         return _OVER.sub(r"\1/\2", text)
     if family == "spend":
+        if (counted := _counted(text, slots, lang)) is not None:
+            return counted
         euros, item = slots.get("logger_euros"), slots.get("logger_money_item")
         if euros is not None and item:
-            amount = f"{int(euros)},{int(slots.get('logger_cents') or 0):02d} €"
+            amount = _euros(euros, slots.get("logger_cents"))
             return (
                 f"gastei {amount} em {item}"
                 if lang == speech.PT

@@ -1297,6 +1297,60 @@
       "title": "Vitamin D",
       "warning": "Vitamin D: already taken, next at 20:00",
       "words": "Took · Vitamin D"
+    },
+    "count": {
+      "alternatives": [
+        {
+          "confidence": 0.35,
+          "eager": false,
+          "head": "Add task",
+          "intent": "task",
+          "label": "Task",
+          "level": "low",
+          "needs": [],
+          "parts": [
+            "inbox"
+          ],
+          "title": "contei 30,00 €",
+          "warning": null,
+          "words": "Add task · contei 30,00 € · inbox"
+        }
+      ],
+      "confidence": 0.95,
+      "eager": true,
+      "fields": {
+        "amount_cents": 3000,
+        "count": true,
+        "line": "contei 30,00 €"
+      },
+      "head": "Count cash €30.00",
+      "intent": "money",
+      "intents": [
+        {
+          "intent": "money",
+          "label": "Money"
+        },
+        {
+          "intent": "shopping",
+          "label": "Shopping"
+        },
+        {
+          "intent": "diary",
+          "label": "Diary"
+        },
+        {
+          "intent": "task",
+          "label": "Task"
+        }
+      ],
+      "label": "Money",
+      "level": "high",
+      "needs": [],
+      "parts": [],
+      "text": "contei 30,00 €",
+      "title": "Pocket",
+      "warning": null,
+      "words": "Count cash €30.00 · Pocket"
     }
   },
   "command_run": {
@@ -1421,6 +1475,20 @@
         "intent": "money"
       },
       {
+        "lang": "pt",
+        "said": "contei 30 euros",
+        "family": "spend",
+        "text": "contei 30,00 €",
+        "intent": "money"
+      },
+      {
+        "lang": "pt",
+        "said": "contei 30",
+        "family": "spend",
+        "text": "contei 30,00 €",
+        "intent": "money"
+      },
+      {
         "lang": "en",
         "said": "i had a cup of tea",
         "family": "log",
@@ -1481,6 +1549,13 @@
         "said": "spent 3 euros on café",
         "family": "spend",
         "text": "spent 3,00 € on Café",
+        "intent": "money"
+      },
+      {
+        "lang": "en",
+        "said": "i counted 30 euros",
+        "family": "spend",
+        "text": "counted cash 30,00 €",
         "intent": "money"
       }
     ]

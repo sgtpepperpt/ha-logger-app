@@ -147,6 +147,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
                 "sexta|sábado|domingo))"
             ),
             "logger_article": "(o|a|os|as|um|uma)",
+            "logger_counted": "(contei|contei dinheiro|contei o dinheiro|dinheiro contado)",
         },
         "command": {
             "log": [
@@ -186,6 +187,9 @@ TEMPLATES: dict[str, dict[str, Any]] = {
                 "(gastei|paguei) {logger_euros} [euro|euros] [e {logger_cents} [cêntimo|cêntimos]]"
                 " (em|no|na|com) {logger_money_item}",
                 "paguei [a|o] {logger_preset}",
+                "<logger_counted>",
+                "<logger_counted> {logger_euros} [euro|euros] [e {logger_cents} [cêntimo|cêntimos]]",
+                "<logger_counted> {logger_text}",
             ],
         },
         "free": [
@@ -219,6 +223,9 @@ TEMPLATES: dict[str, dict[str, Any]] = {
                 "|saturday|sunday))"
             ),
             "logger_article": "(a|an|the|my)",
+            "logger_counted": (
+                "(i counted|i counted cash|counted cash|count cash|cash count|cash counted)"
+            ),
         },
         "command": {
             "log": [
@@ -256,6 +263,9 @@ TEMPLATES: dict[str, dict[str, Any]] = {
                 "[i] (spent|paid) {logger_euros} [euro|euros] [and {logger_cents} [cent|cents]]"
                 " (on|at|for) {logger_money_item}",
                 "[i] paid [the] {logger_preset}",
+                "<logger_counted>",
+                "<logger_counted> {logger_euros} [euro|euros] [and {logger_cents} [cent|cents]]",
+                "<logger_counted> {logger_text}",
             ],
         },
         "free": [

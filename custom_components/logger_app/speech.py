@@ -132,6 +132,15 @@ def join(lang: str, names: list[str]) -> str:
     return ", ".join(names[:-1]) + last + names[-1]
 
 
+def _euros_pt(cents: int) -> str:
+    euros, rest = divmod(cents, 100)
+    whole = f"{euros} {'euro' if euros == 1 else 'euros'}"
+    part = f"{rest} {'cêntimo' if rest == 1 else 'cêntimos'}"
+    if not rest:
+        return whole
+    return f"{whole} e {part}" if euros else part
+
+
 def _pt_done(reading: dict[str, Any], answer: dict[str, Any]) -> str | None:
     intent, head = reading.get("intent"), str(reading.get("head") or "")
     title = _clean(str(reading.get("title") or ""))
@@ -164,6 +173,11 @@ def _pt_done(reading: dict[str, Any], answer: dict[str, Any]) -> str | None:
         )
     if intent == "symptom":
         return f"Registado: {_numbers_pt(title.replace(TIMES, ''))}."
+    if intent == "money" and _dig(reading, "fields", "count") is True:
+        cents = _dig(reading, "fields", "amount_cents")
+        if isinstance(cents, int) and not isinstance(cents, bool):
+            return f"Dinheiro contado: {_euros_pt(cents)}."
+        return None
     if intent == "money":
         amount = re.search(r"€\s?(\d+(?:[.,]\d+)?)", head)
         euros = float(amount.group(1).replace(",", ".")) if amount else None

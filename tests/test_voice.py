@@ -17,6 +17,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+import yaml
 
 from custom_components.logger_app import sentences
 from custom_components.logger_app.const import (
@@ -25,6 +26,7 @@ from custom_components.logger_app.const import (
     EVENT_FIRED,
     SENTENCES_FILE,
 )
+from custom_components.logger_app.voice import command_text
 from homeassistant.const import CONF_URL
 from homeassistant.core import Context, HomeAssistant, ServiceCall
 from homeassistant.helpers import intent
@@ -32,9 +34,25 @@ from homeassistant.util import dt as dt_util
 
 from .conftest import API, URL, bodies, calls, mock_reads, setup_entry
 
+VERSION = json.loads(
+    (Path(sentences.__file__).parent / "manifest.json").read_text(encoding="utf-8")
+)["version"]
+
 
 def contract_parse(contract: dict[str, Any], name: str = "eager") -> dict[str, Any]:
     return deepcopy(contract["command_parse"][name])
+
+
+def counted_without_an_amount(contract: dict[str, Any]) -> dict[str, Any]:
+    count = contract_parse(contract, "count")
+    task = count["alternatives"][0]
+    asked = {
+        **{key: count[key] for key in task},
+        "eager": False,
+        "confidence": 0.45,
+        "needs": contract["command_parse"]["needs"]["needs"],
+    }
+    return {**count, **task, "fields": {}, "alternatives": [asked]}
 
 
 def mock_voice(
@@ -210,6 +228,19 @@ async def test_the_family_s_kind_among_the_alternatives_is_kept(
             {"logger_euros": 3.0, "logger_cents": 5.0, "logger_money_item": "Café"},
             "gastei 3,05 € em Café",
         ),
+        ("spend", "Contei 30 euros.", {"logger_euros": 30.0}, "contei 30,00 €"),
+        (
+            "spend",
+            "contei o dinheiro 30,50 euros",
+            {"logger_text": "30,50 euros"},
+            "contei 30,50 euros",
+        ),
+        (
+            "spend",
+            "contei uma história",
+            {"logger_text": "uma história"},
+            "contei uma história",
+        ),
     ],
 )
 async def test_what_a_voice_cant_say_is_put_back(
@@ -227,6 +258,83 @@ async def test_what_a_voice_cant_say_is_put_back(
     await say(hass, said, family=family, **slots)
     [(_, url, _, _)] = calls(aioclient_mock, "get", "/command/parse")
     assert url.query["text"] == sent
+
+
+@pytest.mark.parametrize(
+    ("lang", "said", "sent", "words"),
+    [
+        ("pt", "Contei 30 euros.", "contei 30,00 €", "Dinheiro contado: 30 euros."),
+        (
+            "en",
+            "I counted 30 euros",
+            "counted cash 30,00 €",
+            "Counted €30.00, it matches",
+        ),
+    ],
+)
+async def test_the_cash_counted_is_written_and_said(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    contract: dict[str, Any],
+    config_entry: MockConfigEntry,
+    lang: str,
+    said: str,
+    sent: str,
+    words: str,
+) -> None:
+    mock_voice(
+        aioclient_mock,
+        contract,
+        parse=contract_parse(contract, "count"),
+        run=(
+            201,
+            {"ok": True, "intent": "money", "words": "Counted €30.00 · it matches"},
+        ),
+    )
+    await setup_entry(hass, config_entry)
+    response = await say(hass, said, lang=lang, family="spend", logger_euros=30.0)
+    assert response.response_type is intent.IntentResponseType.ACTION_DONE
+    assert spoken(response) == words
+    [(_, url, _, _)] = calls(aioclient_mock, "get", "/command/parse")
+    assert url.query["text"] == sent
+    [run] = bodies(aioclient_mock, "post", "/command/run")
+    assert (run["text"], run["intent"]) == (sent, "money")
+
+
+@pytest.mark.parametrize(
+    ("lang", "said", "sent", "words"),
+    [
+        (
+            "pt",
+            "contei",
+            "contei",
+            "Diz outra vez com a quantidade. Não registei nada.",
+        ),
+        (
+            "en",
+            "count cash",
+            "counted cash",
+            "Say it again with the amount. Nothing written.",
+        ),
+    ],
+)
+async def test_the_cash_counted_without_an_amount_asks_for_it(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    contract: dict[str, Any],
+    config_entry: MockConfigEntry,
+    lang: str,
+    said: str,
+    sent: str,
+    words: str,
+) -> None:
+    mock_voice(aioclient_mock, contract, parse=counted_without_an_amount(contract))
+    await setup_entry(hass, config_entry)
+    response = await say(hass, said, lang=lang, family="spend")
+    assert spoken(response) == words
+    [(_, url, _, _)] = calls(aioclient_mock, "get", "/command/parse")
+    assert url.query["text"] == sent
+    assert not calls(aioclient_mock, "post", "/command/run")
 
 
 async def test_an_llm_s_call_names_its_text(
@@ -404,7 +512,7 @@ async def test_on_writes_both_languages_where_both_read_them(
     assert sorted(written) == ["ha/en", "ha/pt", "stp/en", "stp/pt", "stp/pt_PT"]
     for name, text in written.items():
         lang = name.split("/")[1][:2]
-        assert text == sentences.build(contract["command_vocab"], lang, "2026.11.1")
+        assert text == sentences.build(contract["command_vocab"], lang, VERSION)
     assert len(reloads) == 1
     voice = entry.runtime_data.voice.diagnostics()
     assert (voice["on"], len(voice["written"]), voice["error"]) == (True, 5, None)
@@ -419,6 +527,37 @@ async def test_on_writes_both_languages_where_both_read_them(
     assert len(calls(aioclient_mock, "get", "/command/vocab")) == 2
     assert len(entry.runtime_data.voice.diagnostics()["unchanged"]) == 5
     assert len(reloads) == 1
+
+
+@pytest.mark.parametrize(
+    ("lang", "said", "sent"),
+    [
+        ("pt", "contei 30 euros", "contei 30,00 €"),
+        ("en", "i counted 30 euros", "counted cash 30,00 €"),
+    ],
+)
+async def test_the_written_files_say_the_cash_counted(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    contract: dict[str, Any],
+    places: dict[str, Path],
+    reloads: list[ServiceCall],
+    lang: str,
+    said: str,
+    sent: str,
+) -> None:
+    hassil = pytest.importorskip("hassil")
+    from hassil.recognize import recognize_best
+
+    mock_voice(aioclient_mock, contract)
+    await started(hass, voice_entry(contract))
+    heard = recognize_best(
+        said, hassil.Intents.from_dict(yaml.safe_load(files(places)[f"ha/{lang}"]))
+    )
+    assert heard is not None
+    slots = {name: entity.value for name, entity in heard.entities.items()}
+    assert slots.pop("family") == "spend"
+    assert command_text("spend", said, slots, lang) == sent
 
 
 async def test_new_words_rewrite_the_files_once_a_day(

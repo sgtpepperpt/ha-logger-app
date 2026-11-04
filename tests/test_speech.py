@@ -39,6 +39,24 @@ def test_done_english_is_loggers_words_portuguese_is_built() -> None:
     assert speech.done("pt", EAGER, RAN) == "Registado: Café 1 chávena."
 
 
+@pytest.mark.parametrize(
+    ("cents", "pt"),
+    [
+        (3000, "Dinheiro contado: 30 euros."),
+        (100, "Dinheiro contado: 1 euro."),
+        (3050, "Dinheiro contado: 30 euros e 50 cêntimos."),
+        (1, "Dinheiro contado: 1 cêntimo."),
+        (0, "Dinheiro contado: 0 euros."),
+    ],
+)
+def test_done_the_cash_counted(cents: int, pt: str) -> None:
+    said = deepcopy(CONTRACT["command_parse"]["count"])
+    said["fields"]["amount_cents"] = cents
+    ran = {"words": "Counted €30.00 · it matches"}
+    assert speech.done("pt", said, ran) == pt
+    assert speech.done("en", said, ran) == "Counted €30.00, it matches"
+
+
 def reading(
     intent: str, head: str, title: str, parts: list[str] | None = None
 ) -> dict[str, Any]:
