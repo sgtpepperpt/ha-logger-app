@@ -213,6 +213,7 @@
         "overdue": 0,
         "today": 1
       },
+      "runs": 1,
       "waiting": 2,
       "read_only": false,
       "rows": [
@@ -226,11 +227,22 @@
           "overdue": true
         },
         {
+          "id": 95,
+          "summary": "Market run · 3 items",
+          "due": "2026-10-25",
+          "list": "shopping",
+          "words": "today",
+          "kind": "run",
+          "overdue": false,
+          "shop": "Market",
+          "count": 3
+        },
+        {
           "id": 80,
           "summary": "Shoes",
           "due": "2026-10-25",
           "list": "deliveries",
-          "words": "today",
+          "words": "arriving today",
           "kind": "delivery",
           "overdue": false
         },
