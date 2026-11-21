@@ -14,6 +14,31 @@ from custom_components.logger_app.voice import command_text
 from .conftest import CONTRACT
 
 VOCAB: dict[str, Any] = CONTRACT["command_vocab"]
+CLASHING: dict[str, Any] = {
+    "foods": [
+        "Ovo",
+        "ovos",
+        "Pão de ló",
+        "Pão-de-ló",
+        "Iogurte",
+        "IOGURTE",
+        "Arroz doce",
+        "arroz_doce",
+        "Banana",
+        "Chá verde",
+        "Gengibre",
+        "Maçãs",
+        "Leite 2",
+    ],
+    "meals": ["Lanche", "lanche"],
+    "usuals": ["Bananas", "Pão-de-ló", "Maçã", "Leite", "Detergente", "Detergentes"],
+    "products": ["Gengibre", "Chá-verde", "Ovos", "Magnésio", "magnésio"],
+    "units": ["fatias", "Fatia", "chávena"],
+    "shops": ["Mercado", "mercado"],
+    "lists": ["home <-> office", "home - office", "Casa"],
+    "symptoms": ["Dor de cabeça", "dor-de-cabeça"],
+    "money": {"items": ["Café", "café", "Café 2"], "presets": ["Renda", "renda"]},
+}
 
 
 def test_build_is_marked_stable_and_follows_the_words() -> None:
@@ -107,6 +132,88 @@ def test_nothing_from_logger_still_makes_a_file() -> None:
     assert doc["lists"]["logger_unit"]["values"]
 
 
+# Speech-to-Phrase hears words only: case, hyphens and underscores tell no phrase apart.
+def heard(text: str) -> str:
+    return " ".join(text.casefold().replace("-", " ").replace("_", " ").split())
+
+
+def phrases(lists: dict[str, dict[str, Any]], name: str) -> list[str]:
+    out: list[str] = []
+    for value in lists[name]["values"]:
+        said = value if isinstance(value, str) else value["in"].strip("()")
+        out.extend(heard(one) for one in said.split("|"))
+    return out
+
+
+@pytest.mark.parametrize("lang", sentences.LANGUAGES)
+@pytest.mark.parametrize(
+    "vocab", [VOCAB, CLASHING, {}], ids=["contract", "clashing", "empty"]
+)
+def test_each_list_says_each_phrase_once(vocab: dict[str, Any], lang: str) -> None:
+    lists = sentences.lists(vocab, lang)
+    for name, spec in lists.items():
+        if "values" in spec:
+            said = phrases(lists, name)
+            twice = sorted({one for one in said if said.count(one) > 1})
+            assert not twice, (name, twice)
+
+
+@pytest.mark.parametrize("lang", sentences.LANGUAGES)
+@pytest.mark.parametrize("vocab", [VOCAB, CLASHING], ids=["contract", "clashing"])
+def test_a_food_is_never_also_a_shopping_item(vocab: dict[str, Any], lang: str) -> None:
+    lists = sentences.lists(vocab, lang)
+    assert not set(phrases(lists, "logger_food")) & set(phrases(lists, "logger_item"))
+
+
+@pytest.mark.parametrize("vocab", [VOCAB, CLASHING], ids=["contract", "clashing"])
+def test_in_portuguese_a_food_is_never_also_a_product(vocab: dict[str, Any]) -> None:
+    lists = sentences.lists(vocab, "pt")
+    assert not set(phrases(lists, "logger_food")) & set(
+        phrases(lists, "logger_product")
+    )
+
+
+def test_names_said_alike_keep_the_first_spelling_and_the_food() -> None:
+    pt = sentences.lists(CLASHING, "pt")
+    assert pt["logger_food"]["values"] == [
+        "Ovo",
+        "ovos",
+        "Pão de ló",
+        {"in": "(Iogurte|Iogurtes)", "out": "Iogurte"},
+        "Arroz doce",
+        {"in": "(Banana|Bananas)", "out": "Banana"},
+        "Chá verde",
+        {"in": "(Gengibre|Gengibres)", "out": "Gengibre"},
+        "Maçãs",
+        {"in": "(Leite|Leites)", "out": "Leite"},
+        {"in": "(Lanche|Lanches)", "out": "Lanche"},
+    ]
+    assert pt["logger_item"]["values"] == ["Detergente", "Detergentes"]
+    assert pt["logger_product"]["values"] == ["Magnésio"]
+    assert sentences.lists(CLASHING, "en")["logger_product"]["values"] == [
+        "Gengibre",
+        "Chá-verde",
+        "Ovos",
+        "Magnésio",
+    ]
+    assert pt["logger_symptom"]["values"] == ["Dor de cabeça"]
+    assert pt["logger_list"]["values"] == ["home - office", "Casa"]
+    assert pt["logger_money_item"]["values"] == ["Café"]
+    units = pt["logger_unit"]["values"]
+    assert {"chávena", "chávenas", "Fatia", "fatias"} <= {
+        u for u in units if isinstance(u, str)
+    }
+
+
+# Speech-to-Phrase writes a range out at every use: one with tenths is used once.
+@pytest.mark.parametrize("lang", sentences.LANGUAGES)
+def test_a_range_with_tenths_is_used_once(lang: str) -> None:
+    text = sentences.build(VOCAB, lang)
+    for name, spec in sentences.RANGES.items():
+        if "fractions" in spec:
+            assert text.count(f"{{{name}}}") == 1, name
+
+
 def best(text: str, lang: str, vocab: dict[str, Any] = VOCAB) -> Any:
     hassil = pytest.importorskip("hassil")
     from hassil.recognize import recognize_best
@@ -151,6 +258,49 @@ def test_the_cash_counted_is_a_spend_led_as_logger_reads_it(
     slots = {name: entity.value for name, entity in result.entities.items()}
     assert slots.pop("family") == "spend"
     assert command_text("spend", said, slots, lang) == sent
+
+
+@pytest.mark.parametrize(
+    ("said", "lang", "unit"),
+    [
+        ("regista uma chávena de café", "pt", "chávena"),
+        ("regista duas chávenas de café", "pt", "chávenas"),
+        ("i had a slice of toast", "en", "slice"),
+        ("i had two slices of toast", "en", "slices"),
+    ],
+)
+def test_a_unit_is_the_word_said_and_the_line_is_sent_as_said(
+    said: str, lang: str, unit: str
+) -> None:
+    result = best(said, lang)
+    assert result is not None
+    slots = {name: entity.value for name, entity in result.entities.items()}
+    assert (slots.pop("family"), slots.pop("logger_unit")) == ("log", unit)
+    assert command_text("log", said, slots, lang) == said
+
+
+@pytest.mark.parametrize(
+    ("said", "lang", "sent"),
+    [
+        ("o meu peso é 72,4", "pt", "peso 72.4"),
+        ("peso 72,4 quilos", "pt", "peso 72.4"),
+        ("pesei 72,4", "pt", "peso 72.4"),
+        ("pesava 80 kg", "pt", "peso 80"),
+        ("my weight is 72.4", "en", "weight 72.4"),
+        ("weight 72.4 kilos", "en", "weight 72.4"),
+        ("i weigh 72.4", "en", "weight 72.4"),
+        ("weighed 80 kg", "en", "weight 80"),
+    ],
+)
+def test_every_way_to_say_the_weight_reads_the_kilos(
+    said: str, lang: str, sent: str
+) -> None:
+    result = best(said, lang)
+    assert result is not None
+    slots = {name: entity.value for name, entity in result.entities.items()}
+    assert slots.pop("family") == "measure"
+    assert "logger_kg" in slots
+    assert command_text("measure", said, slots, lang) == sent
 
 
 @pytest.mark.parametrize(

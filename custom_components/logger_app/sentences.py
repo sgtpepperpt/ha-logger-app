@@ -176,8 +176,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             ],
             "measure": [
                 "[o|a] [meu|minha] {logger_measure} {logger_text}",
-                "[o] [meu] peso [é|está|foi|de] {logger_kg} [quilos|kg]",
-                "(pesei|pesava) {logger_kg} [quilos|kg]",
+                "([o] [meu] peso [é|está|foi|de]|pesei|pesava) {logger_kg} [quilos|kg]",
                 "[a] [minha] (temperatura|febre) [é|está|foi|de] {logger_celsius} [graus]",
                 "[a] [minha] (tensão|pressão arterial) [é|está|foi|de] {logger_sys}"
                 " (por|sobre) {logger_dia} [[e] (pulso|pulsação) {logger_pulse}]",
@@ -252,8 +251,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             ],
             "measure": [
                 "[my] {logger_measure} {logger_text}",
-                "[my] weight [is] {logger_kg} [kilos|kg]",
-                "[i] (weigh|weighed) {logger_kg} [kilos|kg]",
+                "([my] weight [is]|[i] (weigh|weighed)) {logger_kg} [kilos|kg]",
                 "[my] (temperature|fever) [is] {logger_celsius} [degrees]",
                 "[my] (blood pressure|bp) [is] {logger_sys} over {logger_dia}"
                 " [[and] pulse {logger_pulse}]",
@@ -313,22 +311,38 @@ def spoken(name: Any) -> str | None:
 
 
 def _fold(text: str) -> str:
-    return " ".join(text.casefold().split())
+    return " ".join(text.casefold().replace("-", " ").replace("_", " ").split())
+
+
+def _folds(value: Any) -> set[str]:
+    if isinstance(value, str):
+        return {_fold(value)}
+    return {_fold(value["out"]), _fold(value["out"] + "s")}
 
 
 def _values(
     names: Iterable[Any], plural: bool = False, trim: bool = False
 ) -> list[Any]:
-    out: list[Any] = []
-    seen: set[str] = set()
+    said_all: list[str] = []
     for name in names:
         said = spoken(name)
         if said is not None and trim:
             said = spoken(_TRAILING_NUMBERS.sub("", said)) or said
-        if said is None or _fold(said) in seen:
+        if said is not None:
+            said_all.append(said)
+    named = {_fold(said) for said in said_all}
+    out: list[Any] = []
+    seen: set[str] = set()
+    for said in said_all:
+        if _fold(said) in seen:
             continue
         seen.add(_fold(said))
-        if plural and " " not in said and _VOWEL_END.search(said):
+        if (
+            plural
+            and " " not in said
+            and _VOWEL_END.search(said)
+            and _fold(f"{said}s") not in named
+        ):
             out.append({"in": f"({said}|{said}s)", "out": said})
         else:
             out.append(said)
@@ -358,11 +372,14 @@ def lists(vocab: dict[str, Any], lang: str) -> dict[str, dict[str, Any]]:
         return value if isinstance(value, list) else []
 
     foods = _values([*got("foods"), *got("meals")], plural=True, trim=True)
-    named = {_fold(v if isinstance(v, str) else v["out"]) for v in foods}
+    named = set().union(*map(_folds, foods))
     items = [
         v
         for v in _values(got("usuals"), plural=True, trim=True)
-        if _fold(v if isinstance(v, str) else v["out"]) not in named
+        if not _folds(v) & named
+    ]
+    products = [
+        v for v in _values(got("products")) if lang != "pt" or not _folds(v) & named
     ]
     out: dict[str, dict[str, Any]] = {
         "logger_text": {"wildcard": True},
@@ -370,7 +387,7 @@ def lists(vocab: dict[str, Any], lang: str) -> dict[str, dict[str, Any]]:
     }
     for name, values in (
         ("logger_food", foods),
-        ("logger_product", _values(got("products"))),
+        ("logger_product", products),
         ("logger_item", items),
         ("logger_shop", _values(got("shops"))),
         ("logger_list", _values(got("lists"))),
