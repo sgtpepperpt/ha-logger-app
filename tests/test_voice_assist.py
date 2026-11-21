@@ -63,6 +63,26 @@ async def test_free_text_and_a_measure_through_assist(
     assert sent == ["lembra-me de ligar à mãe amanhã", "peso 72.4"]
 
 
+async def test_what_speech_to_phrase_says_reaches_logger_in_digits(
+    hass: HomeAssistant, assist: AiohttpClientMocker, tmp_path: Path
+) -> None:
+    assert (tmp_path / "custom_sentences" / "pt_PT" / "logger.yaml").exists()
+    for said in (
+        "comi duzentos gramas de café ontem às treze horas",
+        "pesei setenta e dois vírgula quatro quilos",
+        "gastei doze euros e cinquenta cêntimos no café",
+        "contei trinta euros",
+    ):
+        await converse(hass, said, "pt")
+    sent = [c[1].query["text"] for c in calls(assist, "get", "/command/parse")]
+    assert sent == [
+        "comi 200 gramas de café ontem às 13 horas",
+        "peso 72.4",
+        "gastei 12,50 € em Café",
+        "contei 30,00 €",
+    ]
+
+
 async def test_an_answer_through_assist(
     hass: HomeAssistant, assist: AiohttpClientMocker
 ) -> None:

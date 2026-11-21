@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from . import numbers
+
 LANGUAGES = ("pt", "en")
 MARKER = "# Logger voice sentences"
 INTENT_COMMAND = "LoggerCommand"
@@ -149,6 +151,13 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             "logger_article": "(o|a|os|as|um|uma)",
             "logger_counted": "(contei|contei dinheiro|contei o dinheiro|dinheiro contado)",
         },
+        "stp_rules": {
+            "logger_amount": (
+                "((um|uma|meio|meia|dois|duas|três|quatro|{logger_count}) "
+                "[{logger_unit} (de|do|da|dos|das)]"
+                "|{logger_grams} (g|grama|gramas|ml|mililitros) (de|do|da|dos|das))"
+            ),
+        },
         "command": {
             "log": [
                 "(regista|registar|registei|comi|bebi|almocei|jantei|lanchei|tomei|já tomei"
@@ -224,6 +233,13 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             "logger_article": "(a|an|the|my)",
             "logger_counted": (
                 "(i counted|i counted cash|counted cash|count cash|cash count|cash counted)"
+            ),
+        },
+        "stp_rules": {
+            "logger_amount": (
+                "((a|an|one|half a|two|three|four|{logger_count}) "
+                "[{logger_unit} of]"
+                "|{logger_grams} (g|gram|grams|ml|millilitres|milliliters) of)"
             ),
         },
         "command": {
@@ -443,17 +459,71 @@ def document(vocab: dict[str, Any], lang: str) -> dict[str, Any]:
     }
 
 
-def build(vocab: dict[str, Any], lang: str, version: str = "") -> str:
-    body = yaml.safe_dump(
-        document(vocab, lang), allow_unicode=True, sort_keys=False, width=100
-    )
+# Speech-to-Phrase writes out every value of a list or range at every use, each with its own
+# output, and matches every command against all of them. Its copy says units and numbers as
+# plain words, which it folds into one small grammar: Assist reads the words back into the
+# full file's lists and ranges (Brazilian spellings: Assist reads only those).
+def stp_document(vocab: dict[str, Any], lang: str) -> dict[str, Any]:
+    doc = document(vocab, lang)
+    rules = {
+        name: TEMPLATES[lang]["stp_rules"].get(name, rule)
+        for name, rule in doc["expansion_rules"].items()
+    }
+    words: dict[str, str] = {}
+    for name, spec in doc["lists"].items():
+        if name == "logger_unit":
+            said = (
+                v if isinstance(v, str) else v["in"].strip("()") for v in spec["values"]
+            )
+            words[name] = "(" + "|".join(said) + ")"
+        elif "range" in spec:
+            words[name] = numbers.rule(lang, spec["range"])
+
+    def as_words(text: str) -> str:
+        return re.sub(
+            r"\{(\w+)\}",
+            lambda m: f"<{m[1]}>" if m[1] in words else m[0],
+            text,
+        )
+
+    return {
+        "language": lang,
+        "intents": {
+            intent: {
+                "data": [
+                    {**data, "sentences": [as_words(s) for s in data["sentences"]]}
+                    for data in body["data"]
+                ]
+            }
+            for intent, body in doc["intents"].items()
+        },
+        "lists": {
+            name: spec for name, spec in doc["lists"].items() if name not in words
+        },
+        "expansion_rules": {
+            **{name: as_words(rule) for name, rule in rules.items()},
+            **words,
+        },
+    }
+
+
+def _text(doc: dict[str, Any], lang: str, version: str, note: str) -> str:
+    body = yaml.safe_dump(doc, allow_unicode=True, sort_keys=False, width=100)
     digest = hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
     head = (
         f"{MARKER} · {lang} · {digest}\n"
         f"# Written by the Logger integration{f' {version}' if version else ''} from Logger's"
-        " words; rewritten when they change. Edits here are overwritten.\n"
+        f" words{note}; rewritten when they change. Edits here are overwritten.\n"
     )
     return head + body
+
+
+def build(vocab: dict[str, Any], lang: str, version: str = "") -> str:
+    return _text(document(vocab, lang), lang, version, "")
+
+
+def build_stp(vocab: dict[str, Any], lang: str, version: str = "") -> str:
+    return _text(stp_document(vocab, lang), lang, version, " for Speech-to-Phrase")
 
 
 def is_ours(text: str) -> bool:

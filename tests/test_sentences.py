@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
-from custom_components.logger_app import sentences
+from custom_components.logger_app import numbers, sentences
 from custom_components.logger_app.voice import command_text
 
 from .conftest import CONTRACT
@@ -212,6 +212,107 @@ def test_a_range_with_tenths_is_used_once(lang: str) -> None:
     for name, spec in sentences.RANGES.items():
         if "fractions" in spec:
             assert text.count(f"{{{name}}}") == 1, name
+
+
+@pytest.mark.parametrize("lang", sentences.LANGUAGES)
+def test_speech_to_phrase_s_copy_says_numbers_and_units_in_words(lang: str) -> None:
+    text = sentences.build_stp(VOCAB, lang, "2026.11.0")
+    assert sentences.is_ours(text)
+    assert text.splitlines()[0] != sentences.build(VOCAB, lang).splitlines()[0]
+    stp, full = yaml.safe_load(text), sentences.document(VOCAB, lang)
+    said = {"logger_unit", *sentences.RANGES}
+    assert set(stp["intents"]) == set(full["intents"])
+    assert not set(stp["lists"]) & said
+    assert said <= set(stp["expansion_rules"])
+    every = [
+        s
+        for body in stp["intents"].values()
+        for d in body["data"]
+        for s in d["sentences"]
+    ]
+    for line in [*every, *stp["expansion_rules"].values()]:
+        assert not {name for name in said if f"{{{name}}}" in line}, line
+    after = "(de|do|da|dos|das)" if lang == "pt" else " of"
+    assert stp["expansion_rules"]["logger_amount"].count(after) == 2
+
+
+# Speech-to-Phrase hears what its copy says; Assist must read it with the full file's ranges.
+@pytest.mark.parametrize("lang", sentences.LANGUAGES)
+def test_assist_reads_every_number_speech_to_phrase_says(lang: str) -> None:
+    hassil = pytest.importorskip("hassil")
+    from hassil.parse_expression import parse_sentence
+    from hassil.recognize import recognize_best
+    from hassil.sample import sample_sentence
+
+    rules = sentences.stp_document(VOCAB, lang)["expansion_rules"]
+    value = {w: n for n in range(1001) for w in numbers.said(lang, n)}
+    point = f" {numbers.POINT[lang]} "
+    for name, spec in sentences.RANGES.items():
+        found = hassil.Intents.from_dict(
+            {
+                "language": lang,
+                "intents": {"N": {"data": [{"sentences": [f"n {{{name}}}"]}]}},
+                "lists": {name: {"range": spec}},
+            }
+        )
+        for phrase in sample_sentence(parse_sentence(rules[name])):
+            words = " ".join(phrase.split())
+            whole, _, tenth = words.partition(point)
+            want = value[whole] + (value[tenth] / 10 if tenth else 0)
+            result = recognize_best(f"n {words}", found)
+            assert result is not None, (name, words)
+            assert result.entities[name].value == pytest.approx(want), (name, words)
+
+
+@pytest.mark.parametrize(
+    ("said", "lang", "slots"),
+    [
+        (
+            "comi duzentos gramas de Café ontem às treze horas",
+            "pt",
+            {"logger_grams": 200, "logger_food": "Café", "logger_hour": 13},
+        ),
+        ("regista duas chávenas de Café", "pt", {"logger_food": "Café"}),
+        ("pesei setenta e dois vírgula quatro", "pt", {"logger_kg": 72.4}),
+        (
+            "a minha tensão é cento e dezenove por oitenta e pulso sessenta e cinco",
+            "pt",
+            {"logger_sys": 119, "logger_dia": 80, "logger_pulse": 65},
+        ),
+        (
+            "gastei doze euros e cinquenta cêntimos em Café",
+            "pt",
+            {"logger_euros": 12, "logger_cents": 50, "logger_money_item": "Café"},
+        ),
+        ("contei trinta euros", "pt", {"logger_euros": 30}),
+        (
+            "i had two hundred grams of Café today at thirteen",
+            "en",
+            {"logger_grams": 200, "logger_food": "Café", "logger_hour": 13},
+        ),
+        ("my weight is seventy two point four", "en", {"logger_kg": 72.4}),
+    ],
+)
+def test_both_files_read_what_speech_to_phrase_says_alike(
+    said: str, lang: str, slots: dict[str, Any]
+) -> None:
+    hassil = pytest.importorskip("hassil")
+    from hassil.recognize import recognize_best
+
+    def read(text: str) -> dict[str, Any]:
+        result = recognize_best(said, hassil.Intents.from_dict(yaml.safe_load(text)))
+        assert result is not None, said
+        return {
+            name: round(e.value, 1) if isinstance(e.value, float) else e.value
+            for name, e in result.entities.items()
+            if name != "family"
+        }
+
+    assert read(sentences.build_stp(VOCAB, lang)).keys() >= {
+        k for k in slots if k not in sentences.RANGES
+    }
+    got = read(sentences.build(VOCAB, lang))
+    assert {k: got.get(k) for k in slots} == slots
 
 
 def best(text: str, lang: str, vocab: dict[str, Any] = VOCAB) -> Any:

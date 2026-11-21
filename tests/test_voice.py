@@ -85,7 +85,10 @@ async def say(
         hass,
         "conversation",
         intent_type,
-        {name: {"value": value} for name, value in slots.items()},
+        {
+            name: value if isinstance(value, dict) else {"value": value}
+            for name, value in slots.items()
+        },
         text_input=said,
         context=Context(),
         language=lang,
@@ -244,6 +247,76 @@ async def test_the_family_s_kind_among_the_alternatives_is_kept(
     ],
 )
 async def test_what_a_voice_cant_say_is_put_back(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    contract: dict[str, Any],
+    config_entry: MockConfigEntry,
+    family: str,
+    said: str,
+    slots: dict[str, Any],
+    sent: str,
+) -> None:
+    mock_voice(aioclient_mock, contract)
+    await setup_entry(hass, config_entry)
+    await say(hass, said, family=family, **slots)
+    [(_, url, _, _)] = calls(aioclient_mock, "get", "/command/parse")
+    assert url.query["text"] == sent
+
+
+def heard(value: Any, text: str) -> dict[str, Any]:
+    return {"value": value, "text": text}
+
+
+@pytest.mark.parametrize(
+    ("family", "said", "slots", "sent"),
+    [
+        (
+            "log",
+            "comi duzentos gramas de café ontem às treze horas",
+            {
+                "logger_grams": heard(200, "duzentos"),
+                "logger_food": heard("Café", "café"),
+                "logger_hour": heard(13, "treze"),
+            },
+            "comi 200 gramas de café ontem às 13 horas",
+        ),
+        (
+            "log",
+            "comi duas chávenas de chá ontem às duas",
+            {"logger_food": heard("Chá", "chá"), "logger_hour": heard(2, "duas")},
+            "comi duas chávenas de chá ontem às 2",
+        ),
+        (
+            "feel",
+            "tenho dor de cabeça nível três",
+            {"logger_level": heard(3, "três")},
+            "tenho dor de cabeça nível 3",
+        ),
+        (
+            "log",
+            "comi 200 gramas de café",
+            {"logger_grams": heard(200, "200")},
+            "comi 200 gramas de café",
+        ),
+        (
+            "measure",
+            "pesei setenta e dois vírgula quatro quilos",
+            {"logger_kg": heard(72.4, "setenta e dois vírgula quatro")},
+            "peso 72.4",
+        ),
+        (
+            "spend",
+            "gastei doze euros e cinquenta cêntimos no café",
+            {
+                "logger_euros": heard(12, "doze"),
+                "logger_cents": heard(50, "cinquenta"),
+                "logger_money_item": heard("Café", "café"),
+            },
+            "gastei 12,50 € em Café",
+        ),
+    ],
+)
+async def test_numbers_said_in_words_reach_logger_in_digits(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
     contract: dict[str, Any],
@@ -493,7 +566,7 @@ def files(places: dict[str, Path]) -> dict[str, str]:
             encoding="utf-8"
         )
         for where, base in places.items()
-        for folder in ("en", "pt", "pt_PT")
+        for folder in ("en", "en_US", "pt", "pt_PT")
         if (base / folder / SENTENCES_FILE).exists()
     }
 
@@ -509,13 +582,22 @@ async def test_on_writes_both_languages_where_both_read_them(
     entry = voice_entry(contract)
     await started(hass, entry)
     written = files(places)
-    assert sorted(written) == ["ha/en", "ha/pt", "stp/en", "stp/pt", "stp/pt_PT"]
+    assert sorted(written) == [
+        "ha/en",
+        "ha/en_US",
+        "ha/pt",
+        "ha/pt_PT",
+        "stp/en",
+        "stp/pt",
+        "stp/pt_PT",
+    ]
     for name, text in written.items():
         lang = name.split("/")[1][:2]
-        assert text == sentences.build(contract["command_vocab"], lang, VERSION)
+        build = sentences.build if name in ("ha/en", "ha/pt") else sentences.build_stp
+        assert text == build(contract["command_vocab"], lang, VERSION)
     assert len(reloads) == 1
     voice = entry.runtime_data.voice.diagnostics()
-    assert (voice["on"], len(voice["written"]), voice["error"]) == (True, 5, None)
+    assert (voice["on"], len(voice["written"]), voice["error"]) == (True, 7, None)
     assert voice["counts"]["food"] == len(
         sentences.lists(contract["command_vocab"], "pt")["logger_food"]["values"]
     )
@@ -525,7 +607,7 @@ async def test_on_writes_both_languages_where_both_read_them(
     )
     await hass.async_block_till_done(wait_background_tasks=True)
     assert len(calls(aioclient_mock, "get", "/command/vocab")) == 2
-    assert len(entry.runtime_data.voice.diagnostics()["unchanged"]) == 5
+    assert len(entry.runtime_data.voice.diagnostics()["unchanged"]) == 7
     assert len(reloads) == 1
 
 
@@ -595,9 +677,33 @@ async def test_a_file_not_ours_is_never_touched(
     await started(hass, entry)
     assert mine.read_text(encoding="utf-8") == "language: pt\nintents: {}\n"
     assert entry.runtime_data.voice.diagnostics()["kept"] == [str(mine)]
+    assert not (places["ha"] / "pt_PT").exists()
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
     assert mine.exists()
+
+
+async def test_speech_to_phrase_keeps_reading_a_folder_with_other_files(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    contract: dict[str, Any],
+    places: dict[str, Path],
+    reloads: list[ServiceCall],
+) -> None:
+    mock_voice(aioclient_mock, contract)
+    entry = voice_entry(contract)
+    await started(hass, entry)
+    assert (places["ha"] / "pt_PT" / SENTENCES_FILE).exists()
+    theirs = places["ha"] / "pt" / "house.yaml"
+    theirs.write_text("language: pt\nintents: {}\n", encoding="utf-8")
+    await hass.services.async_call(
+        "button", "press", {"entity_id": "button.logger_refresh"}, blocking=True
+    )
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert not (places["ha"] / "pt_PT").exists()
+    assert (places["ha"] / "en_US" / SENTENCES_FILE).exists()
+    assert theirs.read_text(encoding="utf-8") == "language: pt\nintents: {}\n"
+    assert "removed" in entry.runtime_data.voice.diagnostics()
 
 
 async def test_off_removes_ours_and_so_does_removing_the_entry(
@@ -610,7 +716,7 @@ async def test_off_removes_ours_and_so_does_removing_the_entry(
     mock_voice(aioclient_mock, contract)
     entry = voice_entry(contract)
     await started(hass, entry)
-    assert len(files(places)) == 5
+    assert len(files(places)) == 7
 
     hass.config_entries.async_update_entry(entry, options={CONF_VOICE: False})
     await hass.config_entries.async_reload(entry.entry_id)
@@ -622,10 +728,12 @@ async def test_off_removes_ours_and_so_does_removing_the_entry(
     hass.config_entries.async_update_entry(entry, options={CONF_VOICE: True})
     await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
-    assert len(files(places)) == 5
+    assert len(files(places)) == 7
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
     assert files(places) == {}
+    assert not (places["ha"] / "pt_PT").exists()
+    assert not (places["ha"] / "en_US").exists()
 
 
 async def test_off_by_default_writes_nothing(
@@ -654,7 +762,7 @@ async def test_without_share_only_home_assistant_s_folder(
     mock_voice(aioclient_mock, contract)
     with patch("custom_components.logger_app.voice.SHARE_DIR", str(tmp_path / "none")):
         await started(hass, voice_entry(contract))
-    assert sorted(files(places)) == ["ha/en", "ha/pt"]
+    assert sorted(files(places)) == ["ha/en", "ha/en_US", "ha/pt", "ha/pt_PT"]
 
 
 async def test_logger_unreachable_keeps_the_files_and_says_why(

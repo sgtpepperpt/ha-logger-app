@@ -19,7 +19,7 @@ from homeassistant.helpers.start import async_at_started
 from homeassistant.loader import async_get_integration
 from homeassistant.util import dt as dt_util
 
-from . import sentences, speech
+from . import numbers, sentences, speech
 from .api import LoggerError, LoggerRefused
 from .const import (
     CONF_VOICE,
@@ -117,6 +117,32 @@ def voice_logger(hass: HomeAssistant) -> tuple[LoggerCoordinator | None, str | N
 def _slot(intent_obj: intent.Intent, name: str) -> Any:
     slot = intent_obj.slots.get(name)
     return slot.get("value") if isinstance(slot, dict) else None
+
+
+def with_digits(said: str, slots: dict[str, Any]) -> str:
+    # Speech-to-Phrase's copy says numbers in words; Logger reads digits. Right to left: a
+    # number's words can also be an amount said earlier ("duas chávenas … às duas").
+    out, end = said, len(said)
+    found = [
+        slot
+        for name, slot in slots.items()
+        if name in sentences.RANGES and isinstance(slot, dict)
+    ]
+    for slot in reversed(found):
+        words, value = slot.get("text"), numbers.digits(slot.get("value"))
+        if not isinstance(words, str) or not words.strip() or value is None:
+            continue
+        if re.search(r"\d", words):
+            continue
+        hits = list(
+            re.finditer(
+                rf"(?<!\w){re.escape(words.strip())}(?!\w)", out[:end], re.IGNORECASE
+            )
+        )
+        if hits:
+            out = out[: hits[-1].start()] + value + out[hits[-1].end() :]
+            end = hits[-1].start()
+    return out
 
 
 def command_text(
@@ -223,7 +249,10 @@ class LoggerCommandIntent(intent.IntentHandler):
             for name in intent_obj.slots
             if name.startswith("logger_")
         }
-        said = _slot(intent_obj, SLOT_TEXT) or intent_obj.text_input or ""
+        said = with_digits(
+            _slot(intent_obj, SLOT_TEXT) or intent_obj.text_input or "",
+            intent_obj.slots,
+        )
         text = command_text(family, said, slots, lang)
         if not text:
             return _failed(response, speech.say(lang, "nothing_said"))
@@ -317,23 +346,52 @@ def async_setup_intents(hass: HomeAssistant) -> None:
         intent.async_register(hass, handler)
 
 
+ASSIST, STP = "assist", "stp"
 STP_FOLDERS = {"pt": ("pt", "pt_PT"), "en": ("en",)}
+# Speech-to-Phrase reads its model's folder when there is one, else the language's, and Assist
+# never reads the model's: there goes Speech-to-Phrase's copy, beside Assist's own folder.
+STP_MODELS = {"pt": "pt_PT", "en": "en_US"}
 
 
-def _paths(config_dir: Path, lang: str) -> list[Path]:
-    paths = [config_dir / lang / SENTENCES_FILE]
-    if Path(SHARE_DIR).is_dir():
+def _ours(path: Path) -> bool:
+    return sentences.is_ours(path.read_text(encoding="utf-8", errors="replace"))
+
+
+def _others_read(folder: Path) -> bool:
+    return folder.is_dir() and any(not _ours(p) for p in folder.glob("*.yaml"))
+
+
+def _paths(config_dir: Path, lang: str, every: bool = False) -> list[tuple[Path, str]]:
+    paths = [(config_dir / lang / SENTENCES_FILE, ASSIST)]
+    if every or not _others_read(config_dir / lang):
+        paths.append((config_dir / STP_MODELS[lang] / SENTENCES_FILE, STP))
+    if every or Path(SHARE_DIR).is_dir():
         paths += [
-            Path(SPEECH_TO_PHRASE_DIR) / folder / SENTENCES_FILE
+            (Path(SPEECH_TO_PHRASE_DIR) / folder / SENTENCES_FILE, STP)
             for folder in STP_FOLDERS.get(lang, (lang,))
         ]
     return paths
 
 
-def write_files(config_dir: Path, files: dict[str, str]) -> dict[str, list[str]]:
+def _remove(path: Path, done: dict[str, list[str]]) -> None:
+    if not path.exists():
+        return
+    if not _ours(path):
+        done["kept"].append(str(path))
+        return
+    path.unlink()
+    done.setdefault("removed", []).append(str(path))
+    if path.parent.name in STP_MODELS.values() and not any(path.parent.iterdir()):
+        path.parent.rmdir()
+
+
+def write_files(
+    config_dir: Path, files: dict[str, dict[str, str]]
+) -> dict[str, list[str]]:
     done: dict[str, list[str]] = {"written": [], "unchanged": [], "kept": []}
-    for lang, text in files.items():
-        for path in _paths(config_dir, lang):
+    for lang, texts in files.items():
+        for path, kind in _paths(config_dir, lang):
+            text = texts[kind]
             if path.exists():
                 old = path.read_text(encoding="utf-8", errors="replace")
                 if not sentences.is_ours(old):
@@ -347,20 +405,17 @@ def write_files(config_dir: Path, files: dict[str, str]) -> dict[str, list[str]]
             part.write_text(text, encoding="utf-8")
             part.replace(path)
             done["written"].append(str(path))
+        if _others_read(config_dir / lang):
+            # Our copy in the model's folder would hide the other files from Speech-to-Phrase.
+            _remove(config_dir / STP_MODELS[lang] / SENTENCES_FILE, done)
     return done
 
 
 def remove_files(config_dir: Path) -> dict[str, list[str]]:
     done: dict[str, list[str]] = {"removed": [], "kept": []}
     for lang in sentences.LANGUAGES:
-        for path in _paths(config_dir, lang):
-            if not path.exists():
-                continue
-            if sentences.is_ours(path.read_text(encoding="utf-8", errors="replace")):
-                path.unlink()
-                done["removed"].append(str(path))
-            else:
-                done["kept"].append(str(path))
+        for path, _kind in _paths(config_dir, lang, every=True):
+            _remove(path, done)
     return done
 
 
@@ -461,7 +516,11 @@ class VoiceSentences:
         integration = await async_get_integration(self.hass, DOMAIN)
         version = str(integration.version or "")
         files = {
-            lang: sentences.build(vocab, lang, version) for lang in sentences.LANGUAGES
+            lang: {
+                ASSIST: sentences.build(vocab, lang, version),
+                STP: sentences.build_stp(vocab, lang, version),
+            }
+            for lang in sentences.LANGUAGES
         }
         done = await self.hass.async_add_executor_job(
             write_files, Path(self.hass.config.path(SENTENCES_DIR)), files
